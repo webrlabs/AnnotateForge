@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create admin user for LabelFlow
+Create admin user for annotateforge
 Run this script after database migrations
 """
 
@@ -16,7 +16,7 @@ from app.models.user import User
 from app.core.security import get_password_hash
 
 
-def create_admin_user(username="admin", password="admin", email="admin@labelflow.com"):
+def create_admin_user(username="admin", password="admin", email="admin@annotateforge.com"):
     """Create admin user"""
     db = SessionLocal()
 
@@ -63,15 +63,15 @@ def create_admin_user(username="admin", password="admin", email="admin@labelflow
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Create LabelFlow admin user")
+    parser = argparse.ArgumentParser(description="Create annotateforge admin user")
     parser.add_argument("--username", default="admin", help="Admin username (default: admin)")
     parser.add_argument("--password", default="admin", help="Admin password (default: admin)")
-    parser.add_argument("--email", default="admin@labelflow.com", help="Admin email")
+    parser.add_argument("--email", default="admin@annotateforge.com", help="Admin email")
 
     args = parser.parse_args()
 
     print("======================================")
-    print("LabelFlow - Create Admin User")
+    print("annotateforge - Create Admin User")
     print("======================================")
     print("")
 

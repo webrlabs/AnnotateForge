@@ -1,22 +1,22 @@
-# Production Docker Compose configuration for LabelFlow
+# Production Docker Compose configuration for annotateforge
 version: '3.8'
 
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: labelflow-postgres-prod
+    container_name: annotateforge-postgres-prod
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-labelflow}
-      POSTGRES_USER: ${POSTGRES_USER:-labelflow}
+      POSTGRES_DB: ${POSTGRES_DB:-annotateforge}
+      POSTGRES_USER: ${POSTGRES_USER:-annotateforge}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_INITDB_ARGS: "-E UTF8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - labelflow-network
+      - annotateforge-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labelflow}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-annotateforge}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,12 +31,12 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: labelflow-redis-prod
+    container_name: annotateforge-redis-prod
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
     networks:
-      - labelflow-network
+      - annotateforge-network
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
@@ -55,10 +55,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: labelflow-backend-prod
+    container_name: annotateforge-backend-prod
     environment:
       # Database
-      DATABASE_URL: postgresql://${POSTGRES_USER:-labelflow}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-labelflow}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-annotateforge}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-annotateforge}
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
       DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-40}
 
@@ -95,7 +95,7 @@ services:
       - storage_data:/app/storage
       - model_cache:/app/models
     networks:
-      - labelflow-network
+      - annotateforge-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,11 +120,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
-    container_name: labelflow-frontend-prod
+    container_name: annotateforge-frontend-prod
     ports:
       - "${FRONTEND_PORT:-80}:80"
     networks:
-      - labelflow-network
+      - annotateforge-network
     depends_on:
       - backend
     healthcheck:
@@ -141,7 +141,7 @@ services:
         max-file: "3"
 
 networks:
-  labelflow-network:
+  annotateforge-network:
     driver: bridge
 
 volumes:

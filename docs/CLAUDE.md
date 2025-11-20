@@ -907,7 +907,7 @@ annotations = db.query(Annotation).filter(
 When working with Claude on this project, here are helpful prompts:
 
 **For new features:**
-> "I want to add [feature description] to LabelFlow. Based on the existing architecture in IMPLEMENTATION.md, what components need to be created or modified?"
+> "I want to add [feature description] to annotateforge. Based on the existing architecture in IMPLEMENTATION.md, what components need to be created or modified?"
 
 **For debugging:**
 > "I'm seeing [error message] when [action]. Can you help debug this? Here's the relevant code: [paste code]"

@@ -1,6 +1,6 @@
-# LabelFlow on HPC - Quick Start (No Docker)
+# annotateforge on HPC - Quick Start (No Docker)
 
-This guide will get LabelFlow running on your HPC system **without Docker** in just a few steps.
+This guide will get annotateforge running on your HPC system **without Docker** in just a few steps.
 
 ## Prerequisites
 
@@ -45,32 +45,32 @@ Then skip to Step 3.
 **PostgreSQL:**
 ```bash
 # Initialize database
-mkdir -p $HOME/labelflow-db
-initdb -D $HOME/labelflow-db
+mkdir -p $HOME/annotateforge-db
+initdb -D $HOME/annotateforge-db
 
 # Start PostgreSQL
-pg_ctl -D $HOME/labelflow-db -l $HOME/labelflow-db/postgres.log start
+pg_ctl -D $HOME/annotateforge-db -l $HOME/annotateforge-db/postgres.log start
 
 # Create database
-createdb labelflow
+createdb annotateforge
 ```
 
 **Redis:**
 ```bash
 # Create config
-mkdir -p $HOME/labelflow-redis
-cat > $HOME/labelflow-redis/redis.conf << EOF
+mkdir -p $HOME/annotateforge-redis
+cat > $HOME/annotateforge-redis/redis.conf << EOF
 port 6379
 bind 127.0.0.1
-dir $HOME/labelflow-redis
+dir $HOME/annotateforge-redis
 appendonly yes
 EOF
 
 # Start Redis
-redis-server $HOME/labelflow-redis/redis.conf &
+redis-server $HOME/annotateforge-redis/redis.conf &
 ```
 
-## Step 3: Install LabelFlow
+## Step 3: Install annotateforge
 
 ```bash
 # Run the automated installer
@@ -91,13 +91,13 @@ Edit `backend/.env` and update:
 
 ```bash
 # Your PostgreSQL connection
-DATABASE_URL=postgresql://username:password@hostname:5432/labelflow
+DATABASE_URL=postgresql://username:password@hostname:5432/annotateforge
 
 # Your Redis connection
 REDIS_URL=redis://hostname:6379/0
 
 # If using local instances from Step 2:
-# DATABASE_URL=postgresql://$(whoami):@localhost/labelflow
+# DATABASE_URL=postgresql://$(whoami):@localhost/annotateforge
 # REDIS_URL=redis://localhost:6379/0
 ```
 
@@ -119,17 +119,17 @@ python3 create-admin.py
 python3 create-admin.py --username myuser --password mypass --email user@example.com
 ```
 
-## Step 7: Start LabelFlow
+## Step 7: Start annotateforge
 
 ```bash
 # Start everything (uses tmux if available)
-./start-labelflow.sh
+./start-annotateforge.sh
 ```
 
 **With tmux** (recommended):
 - You'll see a split screen with backend and frontend logs
 - Press `Ctrl+B`, then `D` to detach and leave running
-- Reattach with: `tmux attach -t labelflow`
+- Reattach with: `tmux attach -t annotateforge`
 
 **Without tmux**:
 - Services run in background
@@ -158,15 +158,15 @@ Then access: http://localhost:3000
 
 ## Managing the Application
 
-### Stop LabelFlow
+### Stop annotateforge
 ```bash
-./stop-labelflow.sh
+./stop-annotateforge.sh
 ```
 
 ### View Logs
 ```bash
 # If using tmux:
-tmux attach -t labelflow
+tmux attach -t annotateforge
 
 # If using background processes:
 tail -f backend.log
@@ -175,8 +175,8 @@ tail -f frontend.log
 
 ### Restart Services
 ```bash
-./stop-labelflow.sh
-./start-labelflow.sh
+./stop-annotateforge.sh
+./start-annotateforge.sh
 ```
 
 ## Running as a SLURM Job
@@ -184,17 +184,17 @@ tail -f frontend.log
 For longer-running sessions, submit as a job:
 
 ```bash
-# Edit labelflow-job.slurm to match your HPC configuration
+# Edit annotateforge-job.slurm to match your HPC configuration
 # Update paths, module names, and resource requirements
 
 # Submit job
-sbatch labelflow-job.slurm
+sbatch annotateforge-job.slurm
 
 # Check status
 squeue -u $USER
 
 # View output
-tail -f labelflow-*.out
+tail -f annotateforge-*.out
 
 # Get node name from output, then access:
 # http://NODENAME:3000
@@ -205,8 +205,8 @@ tail -f labelflow-*.out
 ### Use Scratch Space
 ```bash
 # Edit backend/.env
-UPLOAD_DIR=/scratch/$USER/labelflow/storage
-MODEL_CACHE_DIR=/scratch/$USER/labelflow/models
+UPLOAD_DIR=/scratch/$USER/annotateforge/storage
+MODEL_CACHE_DIR=/scratch/$USER/annotateforge/models
 ```
 
 ### Increase Workers
@@ -246,10 +246,10 @@ lsof -i :3000
 ### Can't connect to database
 ```bash
 # Test connection
-psql -h hostname -p 5432 -U username -d labelflow
+psql -h hostname -p 5432 -U username -d annotateforge
 
 # Check if local PostgreSQL is running
-pg_ctl -D $HOME/labelflow-db status
+pg_ctl -D $HOME/annotateforge-db status
 ```
 
 ### Frontend won't start
@@ -274,8 +274,8 @@ label-flow/
 ├── check-hpc-env.sh      # Environment checker
 ├── install-hpc.sh        # Automated installer
 ├── create-admin.py       # Create admin user
-├── start-labelflow.sh    # Start services
-├── stop-labelflow.sh     # Stop services
+├── start-annotateforge.sh    # Start services
+├── stop-annotateforge.sh     # Stop services
 ├── start-backend.sh      # Start backend only
 ├── start-frontend.sh     # Start frontend only
 ├── HPC_SETUP.md          # Detailed setup guide
@@ -284,7 +284,7 @@ label-flow/
 
 ## Next Steps
 
-After successfully starting LabelFlow:
+After successfully starting annotateforge:
 
 1. **Login**: Use the credentials you created (default: admin/admin)
 2. **Create Project**: Use the API to create your first project
@@ -294,4 +294,4 @@ After successfully starting LabelFlow:
 
 ---
 
-🎉 **Congratulations!** LabelFlow is now running on your HPC system without Docker.
+🎉 **Congratulations!** annotateforge is now running on your HPC system without Docker.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-LabelFlow now includes a complete training system that allows you to train custom YOLO models (YOLOv8) using your labeled data. The system supports three types of models:
+annotateforge now includes a complete training system that allows you to train custom YOLO models (YOLOv8) using your labeled data. The system supports three types of models:
 
 1. **Classification (YOLOv8-cls)**: Image-level classification
 2. **Detection (YOLOv8)**: Object detection with bounding boxes

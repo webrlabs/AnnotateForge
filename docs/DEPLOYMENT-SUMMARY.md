@@ -1,8 +1,8 @@
-# LabelFlow Deployment Summary
+# annotateforge Deployment Summary
 
 ## ✅ Implementation Complete
 
-Your LabelFlow image annotation platform has been fully implemented with **two deployment options**:
+Your annotateforge image annotation platform has been fully implemented with **two deployment options**:
 
 1. **Docker Deployment** (Quick and easy)
 2. **HPC/Native Deployment** (For systems without Docker)
@@ -56,7 +56,7 @@ cd ..
 python3 create-admin.py
 
 # 7. Start application
-./start-labelflow.sh
+./start-annotateforge.sh
 ```
 
 **Documentation:**
@@ -85,8 +85,8 @@ label-flow/
 │   ├── check-hpc-env.sh       # Check environment
 │   ├── install-hpc.sh         # Automated installer
 │   ├── create-admin.py        # Create admin user
-│   ├── start-labelflow.sh     # Start all services
-│   ├── stop-labelflow.sh      # Stop all services
+│   ├── start-annotateforge.sh     # Start all services
+│   ├── stop-annotateforge.sh      # Stop all services
 │   ├── start-backend.sh       # Start backend only
 │   └── start-frontend.sh      # Start frontend only
 │
@@ -205,13 +205,13 @@ docker-compose up -d --build
 ./check-hpc-env.sh
 
 # Start services
-./start-labelflow.sh
+./start-annotateforge.sh
 
 # Stop services
-./stop-labelflow.sh
+./stop-annotateforge.sh
 
 # View logs (if using tmux)
-tmux attach -t labelflow
+tmux attach -t annotateforge
 
 # View logs (if using background)
 tail -f backend.log
@@ -233,7 +233,7 @@ tail -f frontend.log
 **Key settings to configure:**
 ```bash
 # Database
-DATABASE_URL=postgresql://user:pass@host:5432/labelflow
+DATABASE_URL=postgresql://user:pass@host:5432/annotateforge
 
 # Redis
 REDIS_URL=redis://host:6379/0
@@ -295,7 +295,7 @@ MODEL_CACHE_DIR=/path/to/models
 3. Configure: Edit `backend/.env`
 4. Initialize DB: `cd backend && alembic upgrade head`
 5. Create admin: `python3 create-admin.py`
-6. Start: `./start-labelflow.sh`
+6. Start: `./start-annotateforge.sh`
 7. Access: http://YOUR-NODE:3000
 
 ---
@@ -303,7 +303,7 @@ MODEL_CACHE_DIR=/path/to/models
 ## 💡 Tips
 
 ### Performance
-- Use HPC scratch space for storage (`/scratch/$USER/labelflow`)
+- Use HPC scratch space for storage (`/scratch/$USER/annotateforge`)
 - Increase worker count based on available CPUs
 - Enable GPU support if available
 
@@ -346,6 +346,6 @@ MODEL_CACHE_DIR=/path/to/models
 
 ---
 
-🎉 **LabelFlow is ready to use!**
+🎉 **annotateforge is ready to use!**
 
 Choose your deployment option and follow the corresponding quick start guide.

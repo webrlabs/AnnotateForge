@@ -1,4 +1,4 @@
-# LabelFlow - Implementation Status
+# annotateforge - Implementation Status
 
 **Last Updated:** 2025-01-13
 

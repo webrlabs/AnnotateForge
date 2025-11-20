@@ -300,11 +300,11 @@ class ExportService:
         # Build COCO structure
         coco_data = {
             "info": {
-                "description": f"{project_name} - Exported from LabelFlow",
+                "description": f"{project_name} - Exported from AnnotateForge",
                 "url": "",
                 "version": "1.0",
                 "year": datetime.now().year,
-                "contributor": "LabelFlow",
+                "contributor": "AnnotateForge",
                 "date_created": datetime.now().isoformat()
             },
             "licenses": [

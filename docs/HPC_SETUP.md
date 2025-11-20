@@ -1,6 +1,6 @@
-# LabelFlow - HPC Setup (No Docker)
+# annotateforge - HPC Setup (No Docker)
 
-This guide explains how to run LabelFlow on HPC systems without Docker containers.
+This guide explains how to run annotateforge on HPC systems without Docker containers.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ If your HPC provides PostgreSQL as a service:
 # - Connection string
 
 # Example connection string:
-# postgresql://username:password@db.hpc.edu:5432/labelflow
+# postgresql://username:password@db.hpc.edu:5432/annotateforge
 ```
 
 ### Option B: Use Your Own PostgreSQL
@@ -52,30 +52,30 @@ If you need to run your own PostgreSQL:
 
 ```bash
 # 1. Create a data directory in your home/scratch space
-mkdir -p $HOME/labelflow/postgres-data
+mkdir -p $HOME/annotateforge/postgres-data
 
 # 2. Initialize the database
-initdb -D $HOME/labelflow/postgres-data
+initdb -D $HOME/annotateforge/postgres-data
 
 # 3. Configure PostgreSQL
-# Edit $HOME/labelflow/postgres-data/postgresql.conf
+# Edit $HOME/annotateforge/postgres-data/postgresql.conf
 # Set:
 #   port = 5432  (or another available port)
-#   unix_socket_directories = '$HOME/labelflow/run'
+#   unix_socket_directories = '$HOME/annotateforge/run'
 #   listen_addresses = 'localhost'
 
 # 4. Create socket directory
-mkdir -p $HOME/labelflow/run
+mkdir -p $HOME/annotateforge/run
 
 # 5. Start PostgreSQL
-pg_ctl -D $HOME/labelflow/postgres-data -l $HOME/labelflow/postgres.log start
+pg_ctl -D $HOME/annotateforge/postgres-data -l $HOME/annotateforge/postgres.log start
 
 # 6. Create database
-createdb -p 5432 labelflow
+createdb -p 5432 annotateforge
 
 # 7. Create user
-psql -p 5432 -d labelflow -c "CREATE USER labelflow WITH PASSWORD 'your_password';"
-psql -p 5432 -d labelflow -c "GRANT ALL PRIVILEGES ON DATABASE labelflow TO labelflow;"
+psql -p 5432 -d annotateforge -c "CREATE USER annotateforge WITH PASSWORD 'your_password';"
+psql -p 5432 -d annotateforge -c "GRANT ALL PRIVILEGES ON DATABASE annotateforge TO annotateforge;"
 ```
 
 ## Step 2: Set Up Redis
@@ -91,24 +91,24 @@ psql -p 5432 -d labelflow -c "GRANT ALL PRIVILEGES ON DATABASE labelflow TO labe
 
 ```bash
 # 1. Create Redis directory
-mkdir -p $HOME/labelflow/redis-data
+mkdir -p $HOME/annotateforge/redis-data
 
 # 2. Create Redis config
-cat > $HOME/labelflow/redis.conf << 'EOF'
+cat > $HOME/annotateforge/redis.conf << 'EOF'
 port 6379
 bind 127.0.0.1
-dir /path/to/your/home/labelflow/redis-data
+dir /path/to/your/home/annotateforge/redis-data
 appendonly yes
 EOF
 
 # Replace /path/to/your/home with your actual home directory
-sed -i "s|/path/to/your/home|$HOME|g" $HOME/labelflow/redis.conf
+sed -i "s|/path/to/your/home|$HOME|g" $HOME/annotateforge/redis.conf
 
 # 3. Start Redis
-redis-server $HOME/labelflow/redis.conf &
+redis-server $HOME/annotateforge/redis.conf &
 
 # Save the process ID
-echo $! > $HOME/labelflow/redis.pid
+echo $! > $HOME/annotateforge/redis.pid
 ```
 
 ## Step 3: Set Up Backend (FastAPI)
@@ -142,7 +142,7 @@ pip install -r requirements.txt
 # Create backend environment file
 cat > backend/.env << 'EOF'
 # Database
-DATABASE_URL=postgresql://labelflow:your_password@localhost:5432/labelflow
+DATABASE_URL=postgresql://annotateforge:your_password@localhost:5432/annotateforge
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
@@ -210,7 +210,7 @@ try:
     else:
         admin = User(
             username='admin',
-            email='admin@labelflow.com',
+            email='admin@annotateforge.com',
             hashed_password=get_password_hash('admin'),
             is_admin=True
         )
@@ -288,7 +288,7 @@ source ../venv/bin/activate
 export PYTHONPATH="$(pwd):$PYTHONPATH"
 
 # Start the backend
-echo "Starting LabelFlow Backend..."
+echo "Starting annotateforge Backend..."
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 # For development with auto-reload:
@@ -311,7 +311,7 @@ module load nodejs/18
 cd "$(dirname "$0")/frontend"
 
 # Start the frontend
-echo "Starting LabelFlow Frontend..."
+echo "Starting annotateforge Frontend..."
 npm run dev -- --host 0.0.0.0 --port 3000
 EOF
 
@@ -321,11 +321,11 @@ chmod +x start-frontend.sh
 ### Combined Startup Script (with tmux)
 
 ```bash
-cat > start-labelflow.sh << 'EOF'
+cat > start-annotateforge.sh << 'EOF'
 #!/bin/bash
 
 # Create a tmux session with multiple panes
-SESSION="labelflow"
+SESSION="annotateforge"
 
 # Check if tmux is available
 if ! command -v tmux &> /dev/null; then
@@ -363,22 +363,22 @@ tmux send-keys -t $SESSION:0.0 './start-backend.sh' C-m
 tmux send-keys -t $SESSION:0.1 './start-frontend.sh' C-m
 
 # Attach to the session
-echo "Starting LabelFlow in tmux session..."
+echo "Starting annotateforge in tmux session..."
 echo "Use 'Ctrl+B, D' to detach"
-echo "Use 'tmux attach -t labelflow' to reattach"
+echo "Use 'tmux attach -t annotateforge' to reattach"
 tmux attach -t $SESSION
 EOF
 
-chmod +x start-labelflow.sh
+chmod +x start-annotateforge.sh
 ```
 
 ### Stop Script
 
 ```bash
-cat > stop-labelflow.sh << 'EOF'
+cat > stop-annotateforge.sh << 'EOF'
 #!/bin/bash
 
-echo "Stopping LabelFlow..."
+echo "Stopping annotateforge..."
 
 # Kill processes if PIDs exist
 if [ -f backend.pid ]; then
@@ -394,24 +394,24 @@ if [ -f frontend.pid ]; then
 fi
 
 # Kill tmux session if it exists
-tmux kill-session -t labelflow 2>/dev/null && echo "Tmux session killed"
+tmux kill-session -t annotateforge 2>/dev/null && echo "Tmux session killed"
 
 # Stop Redis if we started it
-if [ -f $HOME/labelflow/redis.pid ]; then
-    kill $(cat $HOME/labelflow/redis.pid) 2>/dev/null
+if [ -f $HOME/annotateforge/redis.pid ]; then
+    kill $(cat $HOME/annotateforge/redis.pid) 2>/dev/null
     echo "Redis stopped"
 fi
 
 # Stop PostgreSQL if we started it
-if [ -f $HOME/labelflow/postgres-data/postmaster.pid ]; then
-    pg_ctl -D $HOME/labelflow/postgres-data stop
+if [ -f $HOME/annotateforge/postgres-data/postmaster.pid ]; then
+    pg_ctl -D $HOME/annotateforge/postgres-data stop
     echo "PostgreSQL stopped"
 fi
 
 echo "All services stopped"
 EOF
 
-chmod +x stop-labelflow.sh
+chmod +x stop-annotateforge.sh
 ```
 
 ## Step 6: Start the Application
@@ -420,7 +420,7 @@ chmod +x stop-labelflow.sh
 
 ```bash
 # Start everything
-./start-labelflow.sh
+./start-annotateforge.sh
 
 # Check if services are running
 curl http://localhost:8000/health
@@ -435,11 +435,11 @@ tail -f frontend.log
 
 ```bash
 # If tmux is available, this gives you interactive panes
-./start-labelflow.sh
+./start-annotateforge.sh
 
 # You'll see split screen with backend and frontend logs
 # Press Ctrl+B, D to detach and leave it running
-# Reattach later with: tmux attach -t labelflow
+# Reattach later with: tmux attach -t annotateforge
 ```
 
 ### Manual Start (For Debugging)
@@ -488,18 +488,18 @@ ssh -L 3000:localhost:3000 -L 8000:localhost:8000 username@hpc-login-node.edu
 
 ## Step 8: Running as a Job (SLURM)
 
-If you want to run LabelFlow as a batch job:
+If you want to run annotateforge as a batch job:
 
 ```bash
-cat > labelflow-job.slurm << 'EOF'
+cat > annotateforge-job.slurm << 'EOF'
 #!/bin/bash
-#SBATCH --job-name=labelflow
+#SBATCH --job-name=annotateforge
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16GB
-#SBATCH --output=labelflow-%j.out
-#SBATCH --error=labelflow-%j.err
+#SBATCH --output=annotateforge-%j.out
+#SBATCH --error=annotateforge-%j.err
 
 # Load modules
 module load python/3.11
@@ -508,12 +508,12 @@ module load postgresql/15
 module load redis/7
 
 # Start Redis (if needed)
-redis-server $HOME/labelflow/redis.conf &
+redis-server $HOME/annotateforge/redis.conf &
 REDIS_PID=$!
 sleep 2
 
 # Start PostgreSQL (if needed)
-pg_ctl -D $HOME/labelflow/postgres-data start
+pg_ctl -D $HOME/annotateforge/postgres-data start
 sleep 5
 
 # Activate Python environment
@@ -532,7 +532,7 @@ FRONTEND_PID=$!
 
 # Print connection info
 echo "========================================"
-echo "LabelFlow is running on: $(hostname -f)"
+echo "annotateforge is running on: $(hostname -f)"
 echo "Frontend: http://$(hostname -f):3000"
 echo "Backend: http://$(hostname -f):8000"
 echo "========================================"
@@ -542,17 +542,17 @@ wait $BACKEND_PID $FRONTEND_PID
 
 # Cleanup
 kill $REDIS_PID 2>/dev/null
-pg_ctl -D $HOME/labelflow/postgres-data stop
+pg_ctl -D $HOME/annotateforge/postgres-data stop
 EOF
 
 # Submit the job
-sbatch labelflow-job.slurm
+sbatch annotateforge-job.slurm
 
 # Check job status
 squeue -u $USER
 
 # View output
-tail -f labelflow-*.out
+tail -f annotateforge-*.out
 ```
 
 ## Troubleshooting
@@ -590,13 +590,13 @@ netstat -tulpn | grep 8000
 
 ```bash
 # Test PostgreSQL connection
-psql -h localhost -p 5432 -U labelflow -d labelflow
+psql -h localhost -p 5432 -U annotateforge -d annotateforge
 
 # Check if PostgreSQL is running
-pg_ctl -D $HOME/labelflow/postgres-data status
+pg_ctl -D $HOME/annotateforge/postgres-data status
 
 # View PostgreSQL logs
-tail -f $HOME/labelflow/postgres.log
+tail -f $HOME/annotateforge/postgres.log
 ```
 
 ### Module Not Found Errors
@@ -618,8 +618,8 @@ python -c "import sys; print('\n'.join(sys.path))"
 
 ```bash
 # Use high-performance scratch for storage
-export UPLOAD_DIR=/scratch/$USER/labelflow/storage
-export MODEL_CACHE_DIR=/scratch/$USER/labelflow/models
+export UPLOAD_DIR=/scratch/$USER/annotateforge/storage
+export MODEL_CACHE_DIR=/scratch/$USER/annotateforge/models
 mkdir -p $UPLOAD_DIR $MODEL_CACHE_DIR
 ```
 
@@ -649,7 +649,7 @@ python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 
 ```bash
 # Stop services
-./stop-labelflow.sh
+./stop-annotateforge.sh
 
 # Pull latest changes (if using git)
 git pull
@@ -668,19 +668,19 @@ cd ../backend
 alembic upgrade head
 
 # Restart
-./start-labelflow.sh
+./start-annotateforge.sh
 ```
 
 ### Backup Database
 
 ```bash
 # Backup PostgreSQL database
-pg_dump -h localhost -p 5432 -U labelflow -d labelflow > labelflow-backup-$(date +%Y%m%d).sql
+pg_dump -h localhost -p 5432 -U annotateforge -d annotateforge > annotateforge-backup-$(date +%Y%m%d).sql
 
 # Restore from backup
-psql -h localhost -p 5432 -U labelflow -d labelflow < labelflow-backup-20250101.sql
+psql -h localhost -p 5432 -U annotateforge -d annotateforge < annotateforge-backup-20250101.sql
 ```
 
 ---
 
-This setup allows you to run LabelFlow entirely without Docker on your HPC system!
+This setup allows you to run annotateforge entirely without Docker on your HPC system!

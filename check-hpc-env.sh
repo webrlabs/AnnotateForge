@@ -1,8 +1,8 @@
 #!/bin/bash
-# Check HPC environment for LabelFlow requirements
+# Check HPC environment for annotateforge requirements
 
 echo "========================================"
-echo "LabelFlow HPC Environment Check"
+echo "annotateforge HPC Environment Check"
 echo "========================================"
 echo ""
 
@@ -148,14 +148,14 @@ echo "========================================"
 echo ""
 
 if [ -z "$MISSING_PYTHON" ] && [ -z "$MISSING_NODE" ] && [ -z "$MISSING_PSQL" ]; then
-    echo -e "${GREEN}✓ System is ready for LabelFlow installation${NC}"
+    echo -e "${GREEN}✓ System is ready for annotateforge installation${NC}"
     echo ""
     echo "Next steps:"
     echo "  1. Run: ./install-hpc.sh"
     echo "  2. Configure database and Redis in backend/.env"
     echo "  3. Run: cd backend && alembic upgrade head"
     echo "  4. Run: python3 create-admin.py"
-    echo "  5. Run: ./start-labelflow.sh"
+    echo "  5. Run: ./start-annotateforge.sh"
 else
     echo -e "${RED}✗ System is missing required dependencies${NC}"
     echo ""

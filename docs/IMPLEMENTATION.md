@@ -1,4 +1,4 @@
-# LabelFlow - Implementation Guide
+# annotateforge - Implementation Guide
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
@@ -16,7 +16,7 @@
 
 ## Project Overview
 
-**LabelFlow** is a modern, web-based image annotation platform designed for teams working on computer vision projects. It provides:
+**annotateforge** is a modern, web-based image annotation platform designed for teams working on computer vision projects. It provides:
 
 - Multi-shape annotation support (circles, boxes, rectangles, polygons)
 - AI-assisted labeling with SimpleBlob, YOLO, and SAM2
@@ -1117,7 +1117,7 @@ class ImageProcessor:
 
 ## Real-Time Collaboration
 
-LabelFlow implements real-time collaboration using **Redis-based persistent presence tracking**. This architecture ensures stable user presence even with unstable WebSocket connections.
+annotateforge implements real-time collaboration using **Redis-based persistent presence tracking**. This architecture ensures stable user presence even with unstable WebSocket connections.
 
 ### Architecture Overview
 
@@ -1726,15 +1726,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: labelflow
-      POSTGRES_USER: labelflow
+      POSTGRES_DB: annotateforge
+      POSTGRES_USER: annotateforge
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labelflow"]
+      test: ["CMD-SHELL", "pg_isready -U annotateforge"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -1752,7 +1752,7 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql://labelflow:${POSTGRES_PASSWORD}@postgres:5432/labelflow
+      DATABASE_URL: postgresql://annotateforge:${POSTGRES_PASSWORD}@postgres:5432/annotateforge
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       UPLOAD_DIR: /app/storage
@@ -1787,7 +1787,7 @@ volumes:
 POSTGRES_PASSWORD=your_secure_password_here
 SECRET_KEY=your_jwt_secret_key_here
 REDIS_URL=redis://redis:6379/0
-DATABASE_URL=postgresql://labelflow:password@postgres:5432/labelflow
+DATABASE_URL=postgresql://annotateforge:password@postgres:5432/annotateforge
 
 # Storage
 UPLOAD_DIR=/app/storage

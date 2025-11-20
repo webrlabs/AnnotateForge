@@ -1,11 +1,11 @@
 #!/bin/bash
-# LabelFlow HPC Installation Script
-# This script sets up LabelFlow without Docker
+# annotateforge HPC Installation Script
+# This script sets up annotateforge without Docker
 
 set -e  # Exit on error
 
 echo "========================================"
-echo "LabelFlow HPC Installation"
+echo "annotateforge HPC Installation"
 echo "========================================"
 
 # Detect project directory
@@ -105,7 +105,7 @@ echo "⚙️  Configuring backend..."
 if [ ! -f "backend/.env" ]; then
     cat > backend/.env << EOF
 # Database (update with your database details)
-DATABASE_URL=postgresql://labelflow:changeme@localhost:5432/labelflow
+DATABASE_URL=postgresql://annotateforge:changeme@localhost:5432/annotateforge
 
 # Redis (update with your Redis details)
 REDIS_URL=redis://localhost:6379/0
@@ -195,9 +195,9 @@ EOF
 chmod +x start-frontend.sh
 
 # Combined script
-cat > start-labelflow.sh << 'EOF'
+cat > start-annotateforge.sh << 'EOF'
 #!/bin/bash
-SESSION="labelflow"
+SESSION="annotateforge"
 
 if command -v tmux &> /dev/null; then
     # Use tmux
@@ -205,7 +205,7 @@ if command -v tmux &> /dev/null; then
     tmux split-window -h -t $SESSION
     tmux send-keys -t $SESSION:0.0 './start-backend.sh' C-m
     tmux send-keys -t $SESSION:0.1 './start-frontend.sh' C-m
-    echo "Starting LabelFlow in tmux session '$SESSION'"
+    echo "Starting annotateforge in tmux session '$SESSION'"
     echo "Use 'tmux attach -t $SESSION' to view"
     echo "Use Ctrl+B, D to detach"
 else
@@ -219,17 +219,17 @@ else
     echo "Frontend PID: $(cat frontend.pid), logs: tail -f frontend.log"
 fi
 EOF
-chmod +x start-labelflow.sh
+chmod +x start-annotateforge.sh
 
 # Stop script
-cat > stop-labelflow.sh << 'EOF'
+cat > stop-annotateforge.sh << 'EOF'
 #!/bin/bash
 [ -f backend.pid ] && kill $(cat backend.pid) 2>/dev/null && rm backend.pid
 [ -f frontend.pid ] && kill $(cat frontend.pid) 2>/dev/null && rm frontend.pid
-tmux kill-session -t labelflow 2>/dev/null
-echo "LabelFlow stopped"
+tmux kill-session -t annotateforge 2>/dev/null
+echo "annotateforge stopped"
 EOF
-chmod +x stop-labelflow.sh
+chmod +x stop-annotateforge.sh
 
 echo "  ✅ Startup scripts created"
 
@@ -253,8 +253,8 @@ echo ""
 echo "3. Create admin user:"
 echo "   python3 create-admin.py"
 echo ""
-echo "4. Start LabelFlow:"
-echo "   ./start-labelflow.sh"
+echo "4. Start annotateforge:"
+echo "   ./start-annotateforge.sh"
 echo ""
 echo "5. Access the application:"
 echo "   Frontend: http://$(hostname):3000"

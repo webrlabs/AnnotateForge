@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application settings"""
 
     # Application
-    PROJECT_NAME: str = "LabelFlow"
+    PROJECT_NAME: str = "AnnotateForge"
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"
@@ -22,8 +22,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
+    # OAuth Configuration
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    OAUTH_REDIRECT_URL: str = "http://localhost:3000/auth/callback"
+
     # Database
-    DATABASE_URL: str = "postgresql://labelflow:changeme@localhost:5432/labelflow"
+    DATABASE_URL: str = "postgresql://annotateforge:changeme@localhost:5432/annotateforge"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 40
 

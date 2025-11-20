@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add ability to train custom models directly through the LabelFlow web interface, with real-time training monitoring and model hosting for inference. Supports three model types:
+Add ability to train custom models directly through the annotateforge web interface, with real-time training monitoring and model hosting for inference. Supports three model types:
 
 1. **Classification Models** (YOLOv8-cls): Image-level classification
 2. **Detection Models** (YOLOv8): Bounding box object detection
@@ -816,7 +816,7 @@ class TrainingService:
         db: Session
     ) -> Tuple[Path, Dict]:
         """
-        Prepare dataset from LabelFlow annotations based on task type.
+        Prepare dataset from annotateforge annotations based on task type.
 
         Returns:
             (dataset_path, dataset_info)

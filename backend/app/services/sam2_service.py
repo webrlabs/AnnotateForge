@@ -39,7 +39,7 @@ class SAM2Service:
             image: numpy array (H, W, 3)
             points: list of (x, y) coordinates
             labels: list of 1 (positive) or 0 (negative)
-            multimask_output: if True, returns 3 masks with different quality scores
+            multimask_output: if True, returns 3 masks with different quality scores (parameter not used by Ultralytics SAM)
 
         Returns:
             List of polygon annotations
@@ -49,23 +49,26 @@ class SAM2Service:
             return []
 
         try:
+            # Note: Ultralytics SAM doesn't support multimask_output parameter
             results = self.model(
                 image,
                 points=points,
-                labels=labels,
-                multimask_output=multimask_output
+                labels=labels
             )
 
             annotations = []
-            for mask in results[0].masks:
-                polygon = self._mask_to_polygon(mask.data.cpu().numpy())
-                if polygon:
-                    annotations.append({
-                        "type": "polygon",
-                        "data": {"points": polygon},
-                        "confidence": float(mask.conf) if hasattr(mask, 'conf') else 0.95,
-                        "source": "sam2"
-                    })
+            if results and len(results) > 0 and results[0].masks is not None:
+                for mask in results[0].masks:
+                    polygon = self._mask_to_polygon(mask.data.cpu().numpy())
+                    if polygon:
+                        annotations.append({
+                            "type": "polygon",
+                            "data": {"points": polygon},
+                            "confidence": float(mask.conf) if hasattr(mask, 'conf') else 0.95,
+                            "source": "sam2"
+                        })
+            else:
+                logger.warning("SAM2 returned no masks")
 
             return annotations
         except Exception as e:

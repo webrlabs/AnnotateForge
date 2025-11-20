@@ -1,6 +1,6 @@
-# LabelFlow - Quick Start Guide
+# annotateforge - Quick Start Guide
 
-This guide will get you up and running with LabelFlow in 5 minutes.
+This guide will get you up and running with annotateforge in 5 minutes.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ docker-compose up -d
 
 ## Step 2: Wait for Services (First Time Only)
 
-The first time you start LabelFlow, it will:
+The first time you start annotateforge, it will:
 1. Download Docker images (~2-3 minutes)
 2. Download ML models (SAM2 ~150MB, YOLO ~6MB)
 3. Initialize the database
@@ -44,7 +44,7 @@ db = SessionLocal()
 try:
     admin = User(
         username='admin',
-        email='admin@labelflow.com',
+        email='admin@annotateforge.com',
         hashed_password=get_password_hash('admin'),
         is_admin=True
     )
@@ -82,10 +82,10 @@ docker-compose ps
 ```
 
 You should see:
-- ✅ labelflow-backend - Up
-- ✅ labelflow-frontend - Up
-- ✅ labelflow-postgres - Up (healthy)
-- ✅ labelflow-redis - Up (healthy)
+- ✅ annotateforge-backend - Up
+- ✅ annotateforge-frontend - Up
+- ✅ annotateforge-postgres - Up (healthy)
+- ✅ annotateforge-redis - Up (healthy)
 
 ### Test the API
 
@@ -243,7 +243,7 @@ docker-compose up -d --build backend
 docker-compose exec backend bash
 
 # Access database
-docker-compose exec postgres psql -U labelflow -d labelflow
+docker-compose exec postgres psql -U annotateforge -d annotateforge
 ```
 
 ## Resources
@@ -267,4 +267,4 @@ If you encounter any issues:
 
 **You're all set!** 🎉
 
-LabelFlow is now running and ready for image annotation.
+annotateforge is now running and ready for image annotation.

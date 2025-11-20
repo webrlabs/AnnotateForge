@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthStore>()(
       },
     }),
     {
-      name: 'labelflow-auth',
+      name: 'annotateforge-auth',
     }
   )
 );

@@ -25,7 +25,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="LabelFlow - Modern Image Annotation Platform",
+    description="AnnotateForge - Modern Image Annotation Platform",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -61,7 +61,7 @@ app.include_router(training.router, prefix=settings.API_V1_PREFIX)
 def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to LabelFlow API",
+        "message": "Welcome to AnnotateForge API",
         "version": settings.VERSION,
         "docs": "/docs",
         "health": "/health"
