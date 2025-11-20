@@ -2,6 +2,8 @@
 
 AnnotateForge is a web-based image annotation platform designed for computer vision teams. It provides efficient labeling of particles, objects, and regions in images using manual tools and AI-assisted suggestions.
 
+[Alt text for the image](screenshots/annotation_tool.png)
+
 ## Features
 
 - **Multi-shape Annotations**: Circles, boxes, rectangles, and polygons
