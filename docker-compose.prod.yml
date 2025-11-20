@@ -1,0 +1,155 @@
+# Production Docker Compose configuration for LabelFlow
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: labelflow-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-labelflow}
+      POSTGRES_USER: ${POSTGRES_USER:-labelflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - labelflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labelflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: labelflow-redis-prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis_data:/data
+    networks:
+      - labelflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: labelflow-backend-prod
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-labelflow}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-labelflow}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-40}
+
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+
+      # Storage
+      UPLOAD_DIR: /app/storage
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-104857600}  # 100MB
+
+      # ML Models
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+      SAM2_MODEL: ${SAM2_MODEL:-sam2.1_b.pt}
+      MODEL_CACHE_DIR: /app/models
+
+      # Performance
+      WORKER_COUNT: ${WORKER_COUNT:-4}
+      INFERENCE_TIMEOUT: ${INFERENCE_TIMEOUT:-30}
+
+      # Environment
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+
+    volumes:
+      - storage_data:/app/storage
+      - model_cache:/app/models
+    networks:
+      - labelflow-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # React Frontend (Production Build)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: labelflow-frontend-prod
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - labelflow-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  labelflow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_data:
+    driver: local
+  model_cache:
+    driver: local

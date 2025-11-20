@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: annotateforge-postgres
+    environment:
+      POSTGRES_DB: annotateforge
+      POSTGRES_USER: annotateforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U annotateforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - annotateforge
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: annotateforge-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - annotateforge
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: annotateforge-backend
+    environment:
+      # Database
+      DATABASE_URL: postgresql://annotateforge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/annotateforge
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-40}
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+
+      # Storage
+      UPLOAD_DIR: /app/storage
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-104857600}  # 100MB
+
+      # ML Models
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+      SAM2_MODEL: ${SAM2_MODEL:-sam2.1_b.pt}
+      MODEL_CACHE_DIR: /app/models
+
+      # Performance
+      WORKER_COUNT: ${WORKER_COUNT:-4}
+      INFERENCE_TIMEOUT: ${INFERENCE_TIMEOUT:-30}
+
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost}
+
+    volumes:
+      - ./backend:/app
+      - storage_data:/app/storage
+      - model_cache:/app/models
+      - training_data:/app/training
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - annotateforge
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: annotateforge-celery-worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql://annotateforge:${POSTGRES_PASSWORD:-changeme}@postgres:5432/annotateforge
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-40}
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-changeme-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+
+      # Storage
+      UPLOAD_DIR: /app/storage
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-104857600}  # 100MB
+
+      # ML Models
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+      SAM2_MODEL: ${SAM2_MODEL:-sam2.1_b.pt}
+      MODEL_CACHE_DIR: /app/models
+
+      # Performance
+      WORKER_COUNT: ${WORKER_COUNT:-4}
+      INFERENCE_TIMEOUT: ${INFERENCE_TIMEOUT:-30}
+
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost}
+
+    volumes:
+      - ./backend:/app
+      - storage_data:/app/storage
+      - model_cache:/app/models
+      - training_data:/app/training
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: celery -A celery_worker.celery_app worker --loglevel=info --queues=training
+    restart: unless-stopped
+    networks:
+      - annotateforge
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: annotateforge-frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped
+    networks:
+      - annotateforge
+
+networks:
+  annotateforge:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_data:
+    driver: local
+  model_cache:
+    driver: local
+  training_data:
+    driver: local
