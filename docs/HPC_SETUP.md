@@ -2,6 +2,8 @@
 
 This guide explains how to run annotateforge on HPC systems without Docker containers.
 
+> **📦 No Root Access?** If you don't have sudo/dnf access or HPC modules, see **[HPC_NO_ROOT_INSTALL.md](./HPC_NO_ROOT_INSTALL.md)** for how to install all dependencies in your home directory using Miniconda or from source.
+
 ## Prerequisites
 
 ### Required Software
@@ -11,7 +13,8 @@ This guide explains how to run annotateforge on HPC systems without Docker conta
 - Redis 7+ (or access to Redis server)
 - Git
 
-### HPC Module System
+### Option A: HPC Module System
+
 Most HPC systems use environment modules. Load required modules:
 
 ```bash
@@ -28,6 +31,22 @@ Check available modules:
 module avail python
 module avail nodejs
 ```
+
+### Option B: Install Without Root Access
+
+If modules aren't available or you need specific versions, use the automated installer:
+
+```bash
+# Quick install using Miniconda (recommended)
+./install-without-root.sh
+# Choose option 1 for fast Miniconda installation
+# Or option 2 for manual source installation
+
+# Then activate environment:
+conda activate annotateforge
+```
+
+See **[HPC_NO_ROOT_INSTALL.md](./HPC_NO_ROOT_INSTALL.md)** for complete details.
 
 ## Step 1: Set Up PostgreSQL Database
 
