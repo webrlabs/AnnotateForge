@@ -497,8 +497,17 @@ class TrainingService:
         hyperparameters = config['hyperparameters']
         task_type = job.task_type
 
-        # Select model based on task type
-        model_name = hyperparameters.get('model', 'yolov8n.pt')
+        # Check if this is a restart from a previous model
+        resume_from_model = config.get('resume_from_model')
+
+        if resume_from_model and os.path.exists(resume_from_model):
+            # Continue training from the previous model
+            model_name = resume_from_model
+            logger.info(f"📦 Loading previous model for continuation: {model_name}")
+        else:
+            # Start from base pretrained model
+            model_name = hyperparameters.get('model', 'yolov8n.pt')
+            logger.info(f"📦 Loading base model: {model_name}")
 
         # Load model
         model = YOLO(model_name)
@@ -619,6 +628,11 @@ class TrainingService:
             'exist_ok': True,
             'verbose': True,
         }
+
+        # Note: We're not using YOLO's built-in 'resume' parameter here
+        # because we're already loading the previous model weights via YOLO(model_path)
+        # The 'resume' parameter in YOLO is for resuming interrupted training from last.pt,
+        # but we want to start fresh training with the previous model as initialization
 
         # Add device if specified
         if 'device' in hyperparameters and hyperparameters['device']:

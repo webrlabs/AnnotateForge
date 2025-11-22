@@ -19,7 +19,15 @@ import {
   Chip,
   Alert,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, FolderOpen as FolderIcon, Edit as EditIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  FolderOpen as FolderIcon,
+  Edit as EditIcon,
+  Public as PublicIcon,
+  Lock as LockIcon,
+  People as PeopleIcon,
+} from '@mui/icons-material';
 import { projectAPI } from '@/services/projectService';
 import { ProjectCreate } from '@/types';
 
@@ -213,20 +221,48 @@ export default function Dashboard() {
                     </Box>
                   )}
                   <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      {project.name}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="h6">
+                        {project.name}
+                      </Typography>
+                      <Chip
+                        icon={project.is_public ? <PublicIcon /> : <LockIcon />}
+                        label={project.is_public ? 'Public' : 'Private'}
+                        size="small"
+                        variant="outlined"
+                        color={project.is_public ? 'success' : 'default'}
+                        sx={{ height: 20, fontSize: '0.65rem' }}
+                      />
+                    </Box>
                     {project.description && (
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {project.description}
                       </Typography>
                     )}
-                    <Chip
-                      label={`${project.image_count || 0} images`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                    />
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={`${project.image_count || 0} images`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                      {project.member_count > 0 && (
+                        <Chip
+                          icon={<PeopleIcon />}
+                          label={`${project.member_count}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                      {!project.can_edit && (
+                        <Chip
+                          label="View Only"
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                        />
+                      )}
+                    </Box>
                   </CardContent>
                   <CardActions>
                     <Button
@@ -241,6 +277,7 @@ export default function Dashboard() {
                       color="primary"
                       onClick={() => handleEditProject({ id: project.id, name: project.name, description: project.description })}
                       sx={{ ml: 'auto' }}
+                      disabled={!project.can_manage_members}
                     >
                       <EditIcon />
                     </IconButton>
@@ -248,6 +285,7 @@ export default function Dashboard() {
                       size="small"
                       color="error"
                       onClick={() => handleDeleteProject(project.id, project.name)}
+                      disabled={!project.can_manage_members}
                     >
                       <DeleteIcon />
                     </IconButton>

@@ -1,5 +1,5 @@
 import api from './api';
-import { Project, ProjectCreate, ProjectUpdate } from '@/types';
+import { Project, ProjectCreate, ProjectUpdate, ProjectMember, ProjectMemberCreate, ProjectMemberUpdate } from '@/types';
 
 export const projectAPI = {
   getAll: async (): Promise<Project[]> => {
@@ -24,5 +24,25 @@ export const projectAPI = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/projects/${id}`);
+  },
+
+  // Member management
+  getMembers: async (projectId: string): Promise<ProjectMember[]> => {
+    const response = await api.get<ProjectMember[]>(`/projects/${projectId}/members`);
+    return response.data;
+  },
+
+  addMember: async (projectId: string, data: ProjectMemberCreate): Promise<ProjectMember> => {
+    const response = await api.post<ProjectMember>(`/projects/${projectId}/members`, data);
+    return response.data;
+  },
+
+  updateMember: async (projectId: string, memberId: string, data: ProjectMemberUpdate): Promise<ProjectMember> => {
+    const response = await api.put<ProjectMember>(`/projects/${projectId}/members/${memberId}`, data);
+    return response.data;
+  },
+
+  removeMember: async (projectId: string, memberId: string): Promise<void> => {
+    await api.delete(`/projects/${projectId}/members/${memberId}`);
   },
 };

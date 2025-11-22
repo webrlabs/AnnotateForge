@@ -37,6 +37,11 @@ export const trainingAPI = {
     await api.delete(`/training/jobs/${jobId}`);
   },
 
+  restartJob: async (jobId: string): Promise<TrainingJobResponse> => {
+    const response = await api.post<TrainingJobResponse>(`/training/jobs/${jobId}/restart`);
+    return response.data;
+  },
+
   getJobMetrics: async (jobId: string): Promise<TrainingMetric[]> => {
     const response = await api.get<TrainingMetric[]>(`/training/jobs/${jobId}/metrics`);
     return response.data;

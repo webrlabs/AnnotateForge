@@ -46,11 +46,17 @@ import {
   SkipNext as SkipNextIcon,
   BarChart as BarChartIcon,
   ExpandMore as ExpandMoreIcon,
+  Settings as SettingsIcon,
+  People as PeopleIcon,
+  Public as PublicIcon,
+  Lock as LockIcon,
 } from '@mui/icons-material';
 import { projectAPI } from '@/services/projectService';
 import { imageAPI } from '@/services/imageService';
 import { exportAPI, type ExportFormat } from '@/services/exportService';
 import { importAPI, type ImportFormat, type ImportResult } from '@/services/importService';
+import { ProjectSettingsDialog } from './ProjectSettingsDialog';
+import { ProjectMembersDialog } from './ProjectMembersDialog';
 
 export default function ProjectView() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -76,6 +82,8 @@ export default function ProjectView() {
   const [dragActive, setDragActive] = useState(false);
   const [page, setPage] = useState(1);
   const imagesPerPage = 50;
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false);
 
   // Fetch project details
   const { data: project } = useQuery({
@@ -338,9 +346,28 @@ export default function ProjectView() {
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box>
-            <Typography variant="h4" gutterBottom>
-              {project?.name || 'Project'}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h4">
+                {project?.name || 'Project'}
+              </Typography>
+              {project && (
+                <Chip
+                  icon={project.is_public ? <PublicIcon /> : <LockIcon />}
+                  label={project.is_public ? 'Public' : 'Private'}
+                  size="small"
+                  variant="outlined"
+                  color={project.is_public ? 'success' : 'default'}
+                />
+              )}
+              {project && project.member_count > 0 && (
+                <Chip
+                  icon={<PeopleIcon />}
+                  label={`${project.member_count} member${project.member_count > 1 ? 's' : ''}`}
+                  size="small"
+                  variant="outlined"
+                />
+              )}
+            </Box>
             {project?.description && (
               <Typography variant="body1" color="text.secondary">
                 {project.description}
@@ -348,11 +375,34 @@ export default function ProjectView() {
             )}
           </Box>
           <Stack direction="row" spacing={1}>
+            {project?.can_manage_members && (
+              <>
+                <Tooltip title="Project Settings">
+                  <Button
+                    variant="outlined"
+                    startIcon={<SettingsIcon />}
+                    onClick={() => setSettingsDialogOpen(true)}
+                  >
+                    Settings
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Manage Members">
+                  <Button
+                    variant="outlined"
+                    startIcon={<PeopleIcon />}
+                    onClick={() => setMembersDialogOpen(true)}
+                  >
+                    Members
+                  </Button>
+                </Tooltip>
+              </>
+            )}
             <Tooltip title="Manage Classes">
               <Button
                 variant="outlined"
                 startIcon={<LabelIcon />}
                 onClick={() => setClassDialogOpen(true)}
+                disabled={!project?.can_edit}
               >
                 Classes
               </Button>
@@ -362,6 +412,7 @@ export default function ProjectView() {
                 variant="outlined"
                 startIcon={<CloudUploadIcon />}
                 onClick={() => setImportDialogOpen(true)}
+                disabled={!project?.can_edit}
               >
                 Import
               </Button>
@@ -383,15 +434,17 @@ export default function ProjectView() {
                 <SkipNextIcon />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Upload Images">
-              <Button
-                variant="contained"
-                startIcon={<UploadIcon />}
-                onClick={() => setUploadDialogOpen(true)}
-              >
-                Upload
-              </Button>
-            </Tooltip>
+            {project?.can_edit && (
+              <Tooltip title="Upload Images">
+                <Button
+                  variant="contained"
+                  startIcon={<UploadIcon />}
+                  onClick={() => setUploadDialogOpen(true)}
+                >
+                  Upload
+                </Button>
+              </Tooltip>
+            )}
           </Stack>
         </Box>
       </Box>
@@ -1135,6 +1188,24 @@ export default function ProjectView() {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* Project Settings Dialog */}
+      {project && (
+        <ProjectSettingsDialog
+          open={settingsDialogOpen}
+          onClose={() => setSettingsDialogOpen(false)}
+          project={project}
+        />
+      )}
+
+      {/* Project Members Dialog */}
+      {project && (
+        <ProjectMembersDialog
+          open={membersDialogOpen}
+          onClose={() => setMembersDialogOpen(false)}
+          project={project}
+        />
+      )}
     </Container>
   );
 }

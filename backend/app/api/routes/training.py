@@ -250,6 +250,101 @@ def get_training_job(
     )
 
 
+@router.post("/jobs/{job_id}/restart", response_model=TrainingJobResponse, status_code=status.HTTP_201_CREATED)
+def restart_training_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Restart a training job with the same configuration
+
+    Args:
+        job_id: Training job UUID to restart
+        db: Database session
+        current_user: Current authenticated user
+
+    Returns:
+        New training job created from the previous job's configuration
+
+    Raises:
+        HTTPException: If job not found, access denied, or job is still running
+    """
+    # Get the original job
+    original_job = db.query(TrainingJob).filter(TrainingJob.id == job_id).first()
+
+    if not original_job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Training job not found"
+        )
+
+    if original_job.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    # Don't allow restarting jobs that are still running
+    if original_job.status in ["pending", "preparing", "training"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot restart a job that is still running. Cancel it first."
+        )
+
+    # Get the trained model from the original job (if it completed successfully)
+    resume_from_model = None
+    if original_job.model_id:
+        trained_model = db.query(TrainedModel).filter(TrainedModel.id == original_job.model_id).first()
+        if trained_model and trained_model.model_path:
+            resume_from_model = trained_model.model_path
+            logger.info(f"Restart will continue from previous model: {resume_from_model}")
+
+    # Create new job with same configuration, but add resume model path
+    new_config = original_job.config.copy()
+    if resume_from_model:
+        new_config['resume_from_model'] = resume_from_model
+
+    new_job = TrainingJob(
+        name=f"{original_job.name} (Restart)",
+        description=original_job.description,
+        task_type=original_job.task_type,
+        config=new_config,
+        total_epochs=original_job.total_epochs,
+        created_by=current_user.id,
+        status="pending"
+    )
+
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+
+    # Trigger Celery task to start training
+    from app.tasks.training_tasks import train_model
+    task = train_model.delay(str(new_job.id))
+
+    # Store the Celery task ID for cancellation
+    new_job.celery_task_id = task.id
+    db.commit()
+
+    logger.info(f"Restarted training job {job_id} as new job {new_job.id}")
+
+    return TrainingJobResponse(
+        id=new_job.id,
+        name=new_job.name,
+        description=new_job.description,
+        task_type=new_job.task_type,
+        status=new_job.status,
+        current_epoch=new_job.current_epoch,
+        total_epochs=new_job.total_epochs,
+        progress_percent=new_job.progress_percent,
+        created_at=new_job.created_at,
+        started_at=new_job.started_at,
+        completed_at=new_job.completed_at,
+        created_by=new_job.created_by
+    )
+
+
 @router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_training_job(
     job_id: UUID,
