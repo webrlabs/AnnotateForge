@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = "8f3a2b1c4d5e"
-down_revision = None  # Will be set by Alembic chain
+down_revision = "add_project_permissions"
 branch_labels = None
 depends_on = None
 

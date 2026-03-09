@@ -223,6 +223,9 @@ export default function ImageCanvas({
       queryClient.invalidateQueries({ queryKey: ['annotations', imageId] });
       addAnnotation(newAnnotation);
     },
+    onError: (error) => {
+      console.error('Failed to create annotation:', error);
+    },
   });
 
   // Delete annotation mutation
