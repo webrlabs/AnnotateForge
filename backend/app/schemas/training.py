@@ -23,7 +23,7 @@ class SplitConfig(BaseModel):
 
 class HyperparametersBase(BaseModel):
     """Base hyperparameters common to all task types"""
-    model: str = "yolov8n.pt"
+    model: str = "yolo26n.pt"
     epochs: int = Field(100, ge=1)
     batch: int = Field(16, ge=1)
     imgsz: int = Field(640, ge=32)
@@ -54,9 +54,15 @@ class SegmentationHyperparameters(HyperparametersBase):
     mask_ratio: int = Field(4, ge=1)
 
 
+class OBBHyperparameters(HyperparametersBase):
+    """OBB-specific hyperparameters"""
+    iou: float = Field(0.7, ge=0.0, le=1.0)
+    conf: float = Field(0.001, ge=0.0, le=1.0)
+
+
 class TrainingConfigBase(BaseModel):
     """Base training configuration"""
-    task_type: Literal["classify", "detect", "segment"]
+    task_type: Literal["classify", "detect", "segment", "obb"]
     projects: List[UUID] = Field(..., min_items=1)
     class_mapping: Dict[str, int] = Field(..., min_items=1)
     split: SplitConfig = SplitConfig()
@@ -82,8 +88,15 @@ class SegmentationTrainingConfig(TrainingConfigBase):
     hyperparameters: SegmentationHyperparameters = SegmentationHyperparameters()
 
 
+class OBBTrainingConfig(TrainingConfigBase):
+    """OBB training configuration"""
+    task_type: Literal["obb"] = "obb"
+    annotation_types: List[str] = Field(..., min_items=1)
+    hyperparameters: OBBHyperparameters = OBBHyperparameters()
+
+
 # Union type for all configs
-TrainingConfig = ClassificationTrainingConfig | DetectionTrainingConfig | SegmentationTrainingConfig
+TrainingConfig = ClassificationTrainingConfig | DetectionTrainingConfig | SegmentationTrainingConfig | OBBTrainingConfig
 
 
 # ===== Training Job Schemas =====
@@ -92,7 +105,7 @@ class TrainingJobCreate(BaseModel):
     """Create training job request"""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    task_type: Literal["classify", "detect", "segment"]
+    task_type: Literal["classify", "detect", "segment", "obb"]
     config: Dict[str, Any]  # Will be validated based on task_type
 
 

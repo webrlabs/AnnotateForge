@@ -6,6 +6,7 @@ import {
   CropSquare as BoxIcon,
   Rectangle as RectangleIcon,
   Polyline as PolygonIcon,
+  Timeline as LineIcon,
   AutoFixHigh as SAM2Icon,
   ViewInAr as YOLOIcon,
   BubbleChart as SimpleBlobIcon,
@@ -54,6 +55,7 @@ export default function ToolPanel({
     { type: 'circle', icon: <CircleIcon />, label: 'Circle', shortcut: 'C' },
     { type: 'rectangle', icon: <RectangleIcon />, label: 'Rectangle', shortcut: 'R' },
     { type: 'polygon', icon: <PolygonIcon />, label: 'Polygon', shortcut: 'P' },
+    { type: 'line', icon: <LineIcon />, label: 'Line', shortcut: 'L' },
   ];
 
   const aiTools: {

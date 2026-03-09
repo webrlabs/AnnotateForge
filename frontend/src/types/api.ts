@@ -27,6 +27,7 @@ export type ToolType =
   | 'box'
   | 'rectangle'
   | 'polygon'
+  | 'line'
   | 'sam2'
   | 'yolo'
   | 'simpleblob';

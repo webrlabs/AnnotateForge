@@ -67,6 +67,8 @@ export default function ImageCanvas({
   const dragStartDataRef = useRef<{
     corners?: [number, number][];
     points?: [number, number][];
+    start?: [number, number];
+    end?: [number, number];
     startPos?: { x: number; y: number };
   } | null>(null);
 
@@ -377,6 +379,9 @@ export default function ImageCanvas({
       case 'rectangle':
         setDrawingData({ x1: x, y1: y, x2: x, y2: y });
         break;
+      case 'line':
+        setDrawingData({ x1: x, y1: y, x2: x, y2: y });
+        break;
       case 'polygon':
         // For polygon, accumulate points
         if (!drawingData) {
@@ -421,6 +426,9 @@ export default function ImageCanvas({
       case 'rectangle':
         setDrawingData({ ...drawingData, x2: x, y2: y });
         break;
+      case 'line':
+        setDrawingData({ ...drawingData, x2: x, y2: y });
+        break;
     }
   };
 
@@ -460,6 +468,13 @@ export default function ImageCanvas({
             const [x, y] = point;
             return x >= minX && x <= maxX && y >= minY && y <= maxY;
           });
+        } else if (ann.type === 'line') {
+          const { start, end } = ann.data;
+          // Check if either endpoint is inside the box
+          return (
+            (start[0] >= minX && start[0] <= maxX && start[1] >= minY && start[1] <= maxY) ||
+            (end[0] >= minX && end[0] <= maxX && end[1] >= minY && end[1] <= maxY)
+          );
         }
         return false;
       });
@@ -521,6 +536,21 @@ export default function ImageCanvas({
           };
         }
         break;
+      case 'line':
+        const lineDx = drawingData.x2 - drawingData.x1;
+        const lineDy = drawingData.y2 - drawingData.y1;
+        const lineLength = Math.sqrt(lineDx * lineDx + lineDy * lineDy);
+        if (lineLength > 5) {
+          annotationData = {
+            type: 'line' as const,
+            data: {
+              start: [drawingData.x1, drawingData.y1],
+              end: [drawingData.x2, drawingData.y2],
+            },
+            source: 'manual' as const,
+          };
+        }
+        break;
     }
 
     if (annotationData) {
@@ -554,6 +584,8 @@ export default function ImageCanvas({
       setTool('rectangle');
     } else if (e.key.toLowerCase() === 'p') {
       setTool('polygon');
+    } else if (e.key.toLowerCase() === 'l') {
+      setTool('line');
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       // Delete selected polygon point
       if (selectedPoint) {
@@ -1087,6 +1119,134 @@ export default function ImageCanvas({
               }
               return null;
 
+            case 'line':
+              const lineData = annotation.data;
+              if (lineData.start && lineData.end) {
+                return (
+                  <Fragment key={annotation.id}>
+                    <Line
+                      points={[lineData.start[0], lineData.start[1], lineData.end[0], lineData.end[1]]}
+                      stroke={strokeColor}
+                      strokeWidth={strokeWidth / scale}
+                      onClick={(e) => selectAnnotation(annotation.id, e.evt.ctrlKey || e.evt.metaKey)}
+                      draggable={isSelected}
+                      onDragStart={(e) => {
+                        const stage = e.target.getStage();
+                        const pointerPos = stage?.getPointerPosition();
+                        if (!pointerPos) return;
+
+                        const imageX = (pointerPos.x - position.x) / scale;
+                        const imageY = (pointerPos.y - position.y) / scale;
+
+                        dragStartDataRef.current = {
+                          start: lineData.start,
+                          end: lineData.end,
+                          startPos: { x: imageX, y: imageY },
+                        };
+                      }}
+                      onDragMove={(e) => {
+                        if (!dragStartDataRef.current?.start || !dragStartDataRef.current?.end || !dragStartDataRef.current?.startPos) return;
+
+                        const stage = e.target.getStage();
+                        const pointerPos = stage?.getPointerPosition();
+                        if (!pointerPos) return;
+
+                        const imageX = (pointerPos.x - position.x) / scale;
+                        const imageY = (pointerPos.y - position.y) / scale;
+
+                        const deltaX = imageX - dragStartDataRef.current.startPos.x;
+                        const deltaY = imageY - dragStartDataRef.current.startPos.y;
+
+                        const newStart: [number, number] = [
+                          dragStartDataRef.current.start[0] + deltaX,
+                          dragStartDataRef.current.start[1] + deltaY,
+                        ];
+                        const newEnd: [number, number] = [
+                          dragStartDataRef.current.end[0] + deltaX,
+                          dragStartDataRef.current.end[1] + deltaY,
+                        ];
+                        updateAnnotationLocal(annotation.id, { data: { start: newStart, end: newEnd } });
+                        e.target.position({ x: 0, y: 0 });
+                      }}
+                      onDragEnd={(e) => {
+                        if (!dragStartDataRef.current?.start || !dragStartDataRef.current?.end || !dragStartDataRef.current?.startPos) return;
+
+                        const stage = e.target.getStage();
+                        const pointerPos = stage?.getPointerPosition();
+                        if (!pointerPos) return;
+
+                        const imageX = (pointerPos.x - position.x) / scale;
+                        const imageY = (pointerPos.y - position.y) / scale;
+
+                        const deltaX = imageX - dragStartDataRef.current.startPos.x;
+                        const deltaY = imageY - dragStartDataRef.current.startPos.y;
+
+                        const newStart: [number, number] = [
+                          dragStartDataRef.current.start[0] + deltaX,
+                          dragStartDataRef.current.start[1] + deltaY,
+                        ];
+                        const newEnd: [number, number] = [
+                          dragStartDataRef.current.end[0] + deltaX,
+                          dragStartDataRef.current.end[1] + deltaY,
+                        ];
+                        updateAnnotation(annotation.id, { data: { start: newStart, end: newEnd } });
+                        updateMutation.mutate({
+                          id: annotation.id,
+                          data: { start: newStart, end: newEnd },
+                        });
+                        e.target.position({ x: 0, y: 0 });
+                        dragStartDataRef.current = null;
+                      }}
+                    />
+                    {isSelected && (
+                      <>
+                        <Circle
+                          key={`${annotation.id}-start`}
+                          x={lineData.start[0]}
+                          y={lineData.start[1]}
+                          radius={6 / scale}
+                          fill="white"
+                          stroke={strokeColor}
+                          strokeWidth={2 / scale}
+                          draggable
+                          onDragMove={(e) => {
+                            updateAnnotationLocal(annotation.id, {
+                              data: { start: [e.target.x(), e.target.y()], end: lineData.end },
+                            });
+                          }}
+                          onDragEnd={(e) => {
+                            const newData = { start: [e.target.x(), e.target.y()], end: lineData.end };
+                            updateAnnotation(annotation.id, { data: newData });
+                            updateMutation.mutate({ id: annotation.id, data: newData });
+                          }}
+                        />
+                        <Circle
+                          key={`${annotation.id}-end`}
+                          x={lineData.end[0]}
+                          y={lineData.end[1]}
+                          radius={6 / scale}
+                          fill="white"
+                          stroke={strokeColor}
+                          strokeWidth={2 / scale}
+                          draggable
+                          onDragMove={(e) => {
+                            updateAnnotationLocal(annotation.id, {
+                              data: { start: lineData.start, end: [e.target.x(), e.target.y()] },
+                            });
+                          }}
+                          onDragEnd={(e) => {
+                            const newData = { start: lineData.start, end: [e.target.x(), e.target.y()] };
+                            updateAnnotation(annotation.id, { data: newData });
+                            updateMutation.mutate({ id: annotation.id, data: newData });
+                          }}
+                        />
+                      </>
+                    )}
+                  </Fragment>
+                );
+              }
+              return null;
+
             default:
               return null;
           }
@@ -1111,6 +1271,14 @@ export default function ImageCanvas({
                 y={Math.min(drawingData.y1, drawingData.y2)}
                 width={Math.abs(drawingData.x2 - drawingData.x1)}
                 height={Math.abs(drawingData.y2 - drawingData.y1)}
+                stroke="#ffff00"
+                strokeWidth={2 / scale}
+                dash={[5 / scale, 5 / scale]}
+              />
+            )}
+            {currentTool === 'line' && (
+              <Line
+                points={[drawingData.x1, drawingData.y1, drawingData.x2, drawingData.y2]}
                 stroke="#ffff00"
                 strokeWidth={2 / scale}
                 dash={[5 / scale, 5 / scale]}

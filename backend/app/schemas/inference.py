@@ -21,7 +21,7 @@ class SimpleBlobParams(BaseModel):
 class YOLOParams(BaseModel):
     """Parameters for YOLO inference"""
     image_id: UUID
-    model: str = "yolov8n.pt"
+    model: str = "yolo26n.pt"
     model_id: Optional[UUID] = None  # ID of trained model to use
     confidence: float = Field(0.5, ge=0.0, le=1.0)
 

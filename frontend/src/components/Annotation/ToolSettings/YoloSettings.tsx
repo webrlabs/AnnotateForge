@@ -49,8 +49,11 @@ export const YoloSettings: React.FC<YoloSettingsProps> = ({
 
   const loadModels = async () => {
     try {
-      const data = await trainingAPI.getModels({ task_type: 'detect' });
-      setModels(data);
+      const [detectModels, obbModels] = await Promise.all([
+        trainingAPI.getModels({ task_type: 'detect' }),
+        trainingAPI.getModels({ task_type: 'obb' }),
+      ]);
+      setModels([...detectModels, ...obbModels]);
       setLoading(false);
     } catch (err) {
       console.error('Failed to load trained models:', err);
@@ -79,7 +82,7 @@ export const YoloSettings: React.FC<YoloSettingsProps> = ({
             >
               <MenuItem value="default">
                 <Box>
-                  <Typography variant="body2">YOLOv8n (default)</Typography>
+                  <Typography variant="body2">YOLO26n (default)</Typography>
                   <Typography variant="caption" color="text.secondary">
                     Pre-trained COCO model - 80 classes
                   </Typography>
@@ -104,7 +107,7 @@ export const YoloSettings: React.FC<YoloSettingsProps> = ({
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {model.num_classes} classes • {model.model_type}
+                      {model.num_classes} classes • {model.model_type} • {model.task_type === 'obb' ? 'OBB' : 'Detection'}
                     </Typography>
                   </Box>
                 </MenuItem>

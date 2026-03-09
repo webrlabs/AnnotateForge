@@ -263,7 +263,7 @@ for detection in detections["annotations"]:
     }
   ],
   "model_info": {
-    "model": "yolov8n.pt",
+    "model": "yolo26n.pt",
     "inference_time_ms": 45.2
   }
 }`}

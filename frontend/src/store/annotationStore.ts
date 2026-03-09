@@ -212,6 +212,12 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
               point[1] + offsetY,
             ]),
           };
+        } else if (ann.type === 'line') {
+          newData = {
+            ...newData,
+            start: [newData.start[0] + offsetX, newData.start[1] + offsetY],
+            end: [newData.end[0] + offsetX, newData.end[1] + offsetY],
+          };
         }
 
         return {
@@ -282,6 +288,12 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
               point[0] + offsetX,
               point[1] + offsetY,
             ]),
+          };
+        } else if (ann.type === 'line') {
+          newData = {
+            ...newData,
+            start: [newData.start[0] + offsetX, newData.start[1] + offsetY],
+            end: [newData.end[0] + offsetX, newData.end[1] + offsetY],
           };
         }
 

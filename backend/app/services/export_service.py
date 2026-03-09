@@ -57,6 +57,21 @@ class ExportService:
             x_max = max(xs)
             y_max = max(ys)
 
+        elif ann_type == 'line':
+            # Line: bounding box from start and end points
+            start, end = data['start'], data['end']
+            x_min = min(start[0], end[0])
+            y_min = min(start[1], end[1])
+            x_max = max(start[0], end[0])
+            y_max = max(start[1], end[1])
+            # Ensure non-zero dimensions for perfectly horizontal/vertical lines
+            if x_max - x_min < 1:
+                x_min -= 1
+                x_max += 1
+            if y_max - y_min < 1:
+                y_min -= 1
+                y_max += 1
+
         else:
             raise ValueError(f"Unknown annotation type: {ann_type}")
 
@@ -116,6 +131,114 @@ class ExportService:
             for point in data['points']:
                 points.extend([point[0] / img_width, point[1] / img_height])
             return points
+
+        elif ann_type == 'line':
+            # Line: convert to thin rectangle polygon
+            import math
+            start, end = data['start'], data['end']
+            dx = end[0] - start[0]
+            dy = end[1] - start[1]
+            length = math.sqrt(dx * dx + dy * dy)
+            if length == 0:
+                return [start[0] / img_width, start[1] / img_height] * 4
+            half_width = 2.0
+            perp_x = -dy / length * half_width
+            perp_y = dx / length * half_width
+            corners = [
+                (start[0] + perp_x, start[1] + perp_y),
+                (end[0] + perp_x, end[1] + perp_y),
+                (end[0] - perp_x, end[1] - perp_y),
+                (start[0] - perp_x, start[1] - perp_y),
+            ]
+            points = []
+            for cx, cy in corners:
+                points.extend([cx / img_width, cy / img_height])
+            return points
+
+        else:
+            raise ValueError(f"Unknown annotation type: {ann_type}")
+
+    def annotation_to_obb(self, annotation: Dict[str, Any], img_width: int, img_height: int) -> List[float]:
+        """
+        Convert a line annotation to YOLO OBB format (4 corner points of a thin oriented bounding box).
+
+        For line annotations, creates a thin rectangle along the line direction.
+        For other annotations, falls back to axis-aligned bounding box corners.
+
+        Args:
+            annotation: Annotation data
+            img_width: Image width in pixels
+            img_height: Image height in pixels
+
+        Returns:
+            List of 8 normalized floats [x1, y1, x2, y2, x3, y3, x4, y4] representing 4 corners
+        """
+        import math
+
+        ann_type = annotation['type']
+        data = annotation['data']
+
+        if ann_type == 'line':
+            start = data['start']
+            end = data['end']
+
+            # Line direction vector
+            dx = end[0] - start[0]
+            dy = end[1] - start[1]
+            length = math.sqrt(dx * dx + dy * dy)
+
+            if length == 0:
+                return [start[0] / img_width, start[1] / img_height] * 4
+
+            # Perpendicular unit vector (for box width)
+            # Use a small fixed half-width (e.g., 2 pixels) to create a thin box
+            half_width = 2.0
+            perp_x = -dy / length * half_width
+            perp_y = dx / length * half_width
+
+            # 4 corners of the oriented bounding box
+            corners = [
+                (start[0] + perp_x, start[1] + perp_y),
+                (end[0] + perp_x, end[1] + perp_y),
+                (end[0] - perp_x, end[1] - perp_y),
+                (start[0] - perp_x, start[1] - perp_y),
+            ]
+
+            # Normalize
+            result = []
+            for cx, cy in corners:
+                result.extend([cx / img_width, cy / img_height])
+            return result
+
+        elif ann_type in ['box', 'rectangle']:
+            corners = data['corners']
+            result = []
+            for corner in corners:
+                result.extend([corner[0] / img_width, corner[1] / img_height])
+            return result
+
+        elif ann_type == 'polygon':
+            # Fall back to bounding box corners
+            points = data['points']
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            x_min, x_max = min(xs), max(xs)
+            y_min, y_max = min(ys), max(ys)
+            return [
+                x_min / img_width, y_min / img_height,
+                x_max / img_width, y_min / img_height,
+                x_max / img_width, y_max / img_height,
+                x_min / img_width, y_max / img_height,
+            ]
+
+        elif ann_type == 'circle':
+            x, y, size = data['x'], data['y'], data['size']
+            return [
+                (x - size) / img_width, (y - size) / img_height,
+                (x + size) / img_width, (y - size) / img_height,
+                (x + size) / img_width, (y + size) / img_height,
+                (x - size) / img_width, (y + size) / img_height,
+            ]
 
         else:
             raise ValueError(f"Unknown annotation type: {ann_type}")
@@ -400,6 +523,35 @@ class ExportService:
                     height = y_max - y_min
                     bbox = [x_min, y_min, width, height]
                     area = width * height  # Approximate
+
+                elif ann.type == 'line':
+                    import math
+                    start, end = ann.data['start'], ann.data['end']
+                    dx = end[0] - start[0]
+                    dy = end[1] - start[1]
+                    length = math.sqrt(dx * dx + dy * dy)
+                    half_w = 2.0
+                    if length > 0:
+                        perp_x = -dy / length * half_w
+                        perp_y = dx / length * half_w
+                    else:
+                        perp_x, perp_y = half_w, 0
+
+                    segmentation = [
+                        start[0] + perp_x, start[1] + perp_y,
+                        end[0] + perp_x, end[1] + perp_y,
+                        end[0] - perp_x, end[1] - perp_y,
+                        start[0] - perp_x, start[1] - perp_y,
+                    ]
+
+                    x_min = min(start[0], end[0]) - half_w
+                    y_min = min(start[1], end[1]) - half_w
+                    x_max = max(start[0], end[0]) + half_w
+                    y_max = max(start[1], end[1]) + half_w
+                    width = x_max - x_min
+                    height = y_max - y_min
+                    bbox = [x_min, y_min, width, height]
+                    area = length * half_w * 2
 
                 else:
                     continue

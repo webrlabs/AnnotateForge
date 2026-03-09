@@ -1,4 +1,4 @@
-export type AnnotationType = 'circle' | 'box' | 'rectangle' | 'polygon';
+export type AnnotationType = 'circle' | 'box' | 'rectangle' | 'polygon' | 'line';
 export type AnnotationSource = 'manual' | 'simpleblob' | 'yolo' | 'sam2';
 
 export interface CircleData {
@@ -15,7 +15,12 @@ export interface PolygonData {
   points: [number, number][];  // Array of [x, y] points
 }
 
-export type AnnotationData = CircleData | BoxData | PolygonData;
+export interface LineData {
+  start: [number, number];  // [x, y]
+  end: [number, number];    // [x, y]
+}
+
+export type AnnotationData = CircleData | BoxData | PolygonData | LineData;
 
 export interface Annotation {
   id: string;

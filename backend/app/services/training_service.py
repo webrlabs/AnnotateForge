@@ -160,6 +160,10 @@ class TrainingService:
             dataset_info = self._prepare_detection_dataset(
                 dataset_dir, train_images, val_images, annotations_by_image, config
             )
+        elif task_type == "obb":
+            dataset_info = self._prepare_obb_dataset(
+                dataset_dir, train_images, val_images, annotations_by_image, config
+            )
         elif task_type == "segment":
             dataset_info = self._prepare_segmentation_dataset(
                 dataset_dir, train_images, val_images, annotations_by_image, config
@@ -280,7 +284,7 @@ class TrainingService:
           data.yaml
         """
         class_mapping = config['class_mapping']
-        annotation_types = config.get('annotation_types', ['circle', 'box', 'rectangle', 'polygon'])
+        annotation_types = config.get('annotation_types', ['circle', 'box', 'rectangle', 'polygon', 'line'])
 
         # Create directory structure
         for split in ['train', 'val']:
@@ -344,6 +348,121 @@ class TrainingService:
                     )
 
                     lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}")
+
+                # Write label file
+                label_path = os.path.join(
+                    dataset_dir, 'labels', split,
+                    os.path.splitext(img.filename)[0] + '.txt'
+                )
+                with open(label_path, 'w') as f:
+                    f.write('\n'.join(lines))
+
+        # Create data.yaml
+        data_yaml = {
+            'path': dataset_dir,
+            'train': 'images/train',
+            'val': 'images/val',
+            'nc': len(class_mapping),
+            'names': list(class_mapping.keys())
+        }
+
+        yaml_path = os.path.join(dataset_dir, 'data.yaml')
+        with open(yaml_path, 'w') as f:
+            yaml.dump(data_yaml, f)
+
+        return {
+            "dataset_dir": dataset_dir,
+            "data_yaml": yaml_path,
+            "num_classes": len(class_mapping),
+            "classes": list(class_mapping.keys())
+        }
+
+    def _prepare_obb_dataset(
+        self,
+        dataset_dir: str,
+        train_images: List[Image],
+        val_images: List[Image],
+        annotations_by_image: Dict[UUID, List[Annotation]],
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Prepare dataset for OBB detection (YOLO OBB format)
+
+        Label format: class_id x1 y1 x2 y2 x3 y3 x4 y4 (normalized 0-1)
+
+        Structure:
+        dataset/
+          images/
+            train/
+            val/
+          labels/
+            train/
+            val/
+          data.yaml
+        """
+        class_mapping = config['class_mapping']
+        annotation_types = config.get('annotation_types', ['line', 'box', 'rectangle'])
+
+        # Create directory structure
+        for split in ['train', 'val']:
+            os.makedirs(os.path.join(dataset_dir, 'images', split), exist_ok=True)
+            os.makedirs(os.path.join(dataset_dir, 'labels', split), exist_ok=True)
+
+        # Process images and create label files
+        for split, images in [('train', train_images), ('val', val_images)]:
+            for img in images:
+                # Copy image
+                if img.original_path.startswith("/storage/"):
+                    src_path = img.original_path.replace("/storage/", self.storage_dir + "/")
+                else:
+                    src_path = img.original_path
+
+                dst_path = os.path.join(dataset_dir, 'images', split, img.filename)
+
+                if os.path.exists(src_path):
+                    shutil.copy2(src_path, dst_path)
+                else:
+                    alt_paths = [
+                        os.path.join(self.storage_dir, img.filename),
+                        os.path.join(self.storage_dir, os.path.basename(img.original_path)),
+                    ]
+                    copied = False
+                    for alt_path in alt_paths:
+                        if os.path.exists(alt_path):
+                            shutil.copy2(alt_path, dst_path)
+                            copied = True
+                            break
+                    if not copied:
+                        logger.error(f"Image not found: {img.filename} (tried {src_path})")
+
+                # Create label file
+                anns = annotations_by_image.get(img.id, [])
+                lines = []
+
+                for ann in anns:
+                    if ann.type not in annotation_types:
+                        continue
+
+                    if not ann.class_label:
+                        logger.warning(f"Annotation {ann.id} in {img.filename} has no class_label - skipping")
+                        continue
+
+                    if ann.class_label not in class_mapping:
+                        logger.warning(f"Annotation {ann.id} in {img.filename} has unknown class '{ann.class_label}' - skipping")
+                        continue
+
+                    class_id = class_mapping[ann.class_label]
+
+                    # Convert to OBB format (4 corners)
+                    obb_coords = self.export_service.annotation_to_obb(
+                        {'type': ann.type, 'data': ann.data},
+                        img.width,
+                        img.height
+                    )
+
+                    # Format: class_id x1 y1 x2 y2 x3 y3 x4 y4
+                    coords_str = ' '.join([f"{coord:.6f}" for coord in obb_coords])
+                    lines.append(f"{class_id} {coords_str}")
 
                 # Write label file
                 label_path = os.path.join(
@@ -506,7 +625,7 @@ class TrainingService:
             logger.info(f"📦 Loading previous model for continuation: {model_name}")
         else:
             # Start from base pretrained model
-            model_name = hyperparameters.get('model', 'yolov8n.pt')
+            model_name = hyperparameters.get('model', 'yolo26n.pt')
             logger.info(f"📦 Loading base model: {model_name}")
 
         # Load model
@@ -642,6 +761,9 @@ class TrainingService:
         if task_type == 'detect':
             train_params['iou'] = hyperparameters.get('iou', 0.7)
             train_params['conf'] = hyperparameters.get('conf', 0.001)
+        elif task_type == 'obb':
+            train_params['iou'] = hyperparameters.get('iou', 0.7)
+            train_params['conf'] = hyperparameters.get('conf', 0.001)
         elif task_type == 'segment':
             train_params['overlap_mask'] = hyperparameters.get('overlap_mask', True)
             train_params['mask_ratio'] = hyperparameters.get('mask_ratio', 4)
@@ -672,6 +794,13 @@ class TrainingService:
                 'top5_accuracy': float(results.results_dict.get('metrics/accuracy_top5', 0)),
             }
         elif task_type == 'detect':
+            metrics = {
+                'precision': float(results.results_dict.get('metrics/precision(B)', 0)),
+                'recall': float(results.results_dict.get('metrics/recall(B)', 0)),
+                'mAP50': float(results.results_dict.get('metrics/mAP50(B)', 0)),
+                'mAP50-95': float(results.results_dict.get('metrics/mAP50-95(B)', 0)),
+            }
+        elif task_type == 'obb':
             metrics = {
                 'precision': float(results.results_dict.get('metrics/precision(B)', 0)),
                 'recall': float(results.results_dict.get('metrics/recall(B)', 0)),
@@ -731,7 +860,7 @@ class TrainingService:
             description=job.description,
             task_type=job.task_type,
             model_path=model_path,
-            model_type='yolov8',
+            model_type='yolo26',
             image_size=hyperparameters.get('imgsz', 640),
             num_classes=dataset_info['num_classes'],
             classes=config['class_mapping'],

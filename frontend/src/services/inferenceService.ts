@@ -18,7 +18,7 @@ export const inferenceAPI = {
   yolo: async (params: InferenceParams & { confidence?: number; model_id?: string }): Promise<InferenceResponse> => {
     const response = await api.post<InferenceResponse>('/inference/yolo', {
       image_id: params.image_id,
-      model: 'yolov8n.pt',
+      model: 'yolo26n.pt',
       model_id: params.model_id || null,
       confidence: params.confidence || 0.5,
     });

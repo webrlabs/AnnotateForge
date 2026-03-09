@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, Literal
 
 class AnnotationCreate(BaseModel):
     """Schema for creating an annotation"""
-    type: Literal["circle", "box", "rectangle", "polygon"]
+    type: Literal["circle", "box", "rectangle", "polygon", "line"]
     data: Dict[str, Any]
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     source: Literal["manual", "simpleblob", "yolo", "sam2"] = "manual"
@@ -29,6 +29,12 @@ class AnnotationCreate(BaseModel):
         elif annotation_type == "polygon":
             if "points" not in v or len(v["points"]) < 3:
                 raise ValueError("Polygon requires at least 3 points")
+        elif annotation_type == "line":
+            required = ["start", "end"]
+            if not all(k in v for k in required):
+                raise ValueError(f"Line requires: {required}")
+            if len(v["start"]) != 2 or len(v["end"]) != 2:
+                raise ValueError("Line start and end must be [x, y] points")
 
         return v
 

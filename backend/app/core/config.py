@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 104857600  # 100MB in bytes
 
     # ML Models
-    YOLO_MODEL: str = "yolov8n.pt"
+    YOLO_MODEL: str = "yolo26n.pt"
     SAM2_MODEL: str = "sam2.1_b.pt"
     MODEL_CACHE_DIR: str = "/app/models"
 

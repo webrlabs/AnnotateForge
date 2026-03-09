@@ -2,7 +2,7 @@
  * Training system types
  */
 
-export type TaskType = 'classify' | 'detect' | 'segment';
+export type TaskType = 'classify' | 'detect' | 'segment' | 'obb';
 
 export type TrainingStatus = 'pending' | 'preparing' | 'training' | 'completed' | 'failed' | 'cancelled';
 
@@ -42,7 +42,12 @@ export interface SegmentationHyperparameters extends HyperparametersBase {
   mask_ratio: number;
 }
 
-export type Hyperparameters = ClassificationHyperparameters | DetectionHyperparameters | SegmentationHyperparameters;
+export interface OBBHyperparameters extends HyperparametersBase {
+  iou: number;
+  conf: number;
+}
+
+export type Hyperparameters = ClassificationHyperparameters | DetectionHyperparameters | SegmentationHyperparameters | OBBHyperparameters;
 
 export interface TrainingConfigBase {
   task_type: TaskType;
@@ -68,7 +73,13 @@ export interface SegmentationTrainingConfig extends TrainingConfigBase {
   hyperparameters: SegmentationHyperparameters;
 }
 
-export type TrainingConfig = ClassificationTrainingConfig | DetectionTrainingConfig | SegmentationTrainingConfig;
+export interface OBBTrainingConfig extends TrainingConfigBase {
+  task_type: 'obb';
+  annotation_types: string[];
+  hyperparameters: OBBHyperparameters;
+}
+
+export type TrainingConfig = ClassificationTrainingConfig | DetectionTrainingConfig | SegmentationTrainingConfig | OBBTrainingConfig;
 
 // API types
 export interface TrainingJobCreate {
