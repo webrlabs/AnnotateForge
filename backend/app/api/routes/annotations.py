@@ -10,7 +10,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.image import Image
 from app.models.annotation import Annotation
-from app.schemas.annotation import AnnotationCreate, AnnotationUpdate, AnnotationResponse
+from app.schemas.annotation import AnnotationCreate, AnnotationUpdate, AnnotationResponse, BatchUpdateRequest, BatchDeleteRequest
 from app.services.audit_service import AuditService
 from app.services.connection_manager import manager
 
@@ -303,3 +303,52 @@ async def delete_annotation(
     )
 
     return None
+
+
+@router.put("/batch", response_model=List[AnnotationResponse])
+def batch_update_annotations(
+    request: BatchUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Batch update multiple annotations (class_label, confidence, etc.)"""
+    annotations = db.query(Annotation).filter(
+        Annotation.id.in_(request.annotation_ids)
+    ).all()
+
+    if not annotations:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No annotations found"
+        )
+
+    update_data = request.updates.model_dump(exclude_unset=True)
+    for annotation in annotations:
+        for key, value in update_data.items():
+            if value is not None:
+                setattr(annotation, key, value)
+
+    db.commit()
+    for a in annotations:
+        db.refresh(a)
+    return annotations
+
+
+@router.delete("/batch", status_code=status.HTTP_204_NO_CONTENT)
+def batch_delete_annotations(
+    request: BatchDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Batch delete multiple annotations"""
+    deleted = db.query(Annotation).filter(
+        Annotation.id.in_(request.annotation_ids)
+    ).delete(synchronize_session='fetch')
+
+    if deleted == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No annotations found"
+        )
+
+    db.commit()

@@ -28,4 +28,18 @@ export const annotationAPI = {
   delete: async (id: string): Promise<void> => {
     await api.delete(`/annotations/${id}`);
   },
+
+  batchUpdate: async (annotationIds: string[], updates: AnnotationUpdate): Promise<Annotation[]> => {
+    const response = await api.put<Annotation[]>('/annotations/batch', {
+      annotation_ids: annotationIds,
+      updates,
+    });
+    return response.data;
+  },
+
+  batchDelete: async (annotationIds: string[]): Promise<void> => {
+    await api.delete('/annotations/batch', {
+      data: { annotation_ids: annotationIds },
+    });
+  },
 };

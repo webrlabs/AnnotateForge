@@ -15,6 +15,13 @@ class ImageUpdate(BaseModel):
     image_class: Optional[str] = None
 
 
+class AnnotationCounts(BaseModel):
+    """Detailed annotation count breakdown"""
+    total: int = 0
+    by_class: Dict[str, int] = {}
+    by_type: Dict[str, int] = {}
+
+
 class ImageResponse(BaseModel):
     """Schema for image response"""
     id: UUID
@@ -32,6 +39,7 @@ class ImageResponse(BaseModel):
     metadata: Dict[str, Any] = {}
     annotation_count: int = 0
     annotation_classes: List[str] = []
+    annotation_counts: Optional[AnnotationCounts] = None
 
     class Config:
         from_attributes = True

@@ -9,8 +9,12 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  ArrowBack as ArrowBackIcon,
   Brightness6 as BrightnessIcon,
   Contrast as ContrastIcon,
+  InvertColors as InvertIcon,
+  WaterDrop as SaturationIcon,
+  Tune as GammaIcon,
   Refresh as ResetIcon,
   NavigateBefore as NavigateBeforeIcon,
   NavigateNext as NavigateNextIcon,
@@ -22,9 +26,14 @@ import {
   AspectRatio as FitWidthIcon,
   PhotoSizeSelectActual as ActualSizeIcon,
   HelpOutline as HelpIcon,
+  SkipNext as SkipNextIcon,
 } from '@mui/icons-material';
 
 interface ImageToolbarProps {
+  // Project navigation
+  projectName?: string;
+  onNavigateToProject?: () => void;
+
   // Navigation
   currentImageIndex: number;
   totalImages: number;
@@ -45,9 +54,19 @@ interface ImageToolbarProps {
   // Image Enhancement
   brightness: number;
   contrast: number;
+  saturation?: number;
+  gamma?: number;
+  invert?: boolean;
   onBrightnessChange: (value: number) => void;
   onContrastChange: (value: number) => void;
+  onSaturationChange?: (value: number) => void;
+  onGammaChange?: (value: number) => void;
+  onInvertToggle?: () => void;
   onResetEnhancements: () => void;
+
+  // Auto-advance
+  autoAdvance?: boolean;
+  onAutoAdvanceToggle?: () => void;
 
   // Help
   onHelpOpen: () => void;
@@ -70,11 +89,21 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
   onZoom,
   brightness,
   contrast,
+  saturation = 100,
+  gamma = 1.0,
+  invert = false,
   onBrightnessChange,
   onContrastChange,
+  onSaturationChange,
+  onGammaChange,
+  onInvertToggle,
   onResetEnhancements,
   onHelpOpen,
   imageFilename,
+  projectName,
+  onNavigateToProject,
+  autoAdvance,
+  onAutoAdvanceToggle,
 }) => {
   return (
     <Box
@@ -85,6 +114,18 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
       }}
     >
       <Toolbar variant="dense" sx={{ minHeight: 48, gap: 1 }}>
+        {/* Back to Project */}
+        {onNavigateToProject && (
+          <>
+            <Tooltip title="Back to Project (Esc)">
+              <IconButton onClick={onNavigateToProject} size="small">
+                <ArrowBackIcon />
+              </IconButton>
+            </Tooltip>
+            <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+          </>
+        )}
+
         {/* Image Navigation */}
         <Tooltip title="Previous image (←)">
           <span>
@@ -97,9 +138,11 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
             </IconButton>
           </span>
         </Tooltip>
-        <Typography variant="body2" sx={{ mx: 1, color: 'text.secondary' }}>
-          {currentImageIndex + 1} / {totalImages}
-        </Typography>
+        <Tooltip title={imageFilename || ''} placement="bottom">
+          <Typography variant="body2" sx={{ mx: 1, color: 'text.secondary', cursor: 'default' }}>
+            {currentImageIndex + 1} / {totalImages}
+          </Typography>
+        </Tooltip>
         <Tooltip title="Next image (→)">
           <span>
             <IconButton
@@ -111,6 +154,18 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
             </IconButton>
           </span>
         </Tooltip>
+
+        {onAutoAdvanceToggle && (
+          <Tooltip title={`Auto-advance to next unannotated image: ${autoAdvance ? 'ON' : 'OFF'}`}>
+            <IconButton
+              onClick={onAutoAdvanceToggle}
+              size="small"
+              color={autoAdvance ? 'primary' : 'default'}
+            >
+              <SkipNextIcon />
+            </IconButton>
+          </Tooltip>
+        )}
 
         <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
 
@@ -169,10 +224,8 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
 
         <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
 
-        {/* Image Filename */}
-        <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-          {imageFilename || 'Loading...'}
-        </Typography>
+        {/* Spacer */}
+        <Box sx={{ flexGrow: 1 }} />
 
         {/* Image Enhancement Controls */}
         <Stack direction="row" spacing={2} alignItems="center">
@@ -202,7 +255,49 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
               />
             </Box>
           </Tooltip>
-          <Tooltip title="Reset">
+          {onSaturationChange && (
+            <Tooltip title={`Saturation: ${saturation}%`}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 140 }}>
+                <SaturationIcon fontSize="small" />
+                <Slider
+                  value={saturation}
+                  onChange={(_, value) => onSaturationChange(value as number)}
+                  min={0}
+                  max={200}
+                  size="small"
+                  sx={{ width: 100 }}
+                />
+              </Box>
+            </Tooltip>
+          )}
+          {onGammaChange && (
+            <Tooltip title={`Gamma: ${gamma?.toFixed(1)}`}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 140 }}>
+                <GammaIcon fontSize="small" />
+                <Slider
+                  value={gamma}
+                  onChange={(_, value) => onGammaChange(value as number)}
+                  min={0.1}
+                  max={3.0}
+                  step={0.1}
+                  size="small"
+                  sx={{ width: 100 }}
+                />
+              </Box>
+            </Tooltip>
+          )}
+          {onInvertToggle && (
+            <Tooltip title={`Invert colors (I): ${invert ? 'ON' : 'OFF'}`}>
+              <IconButton
+                size="small"
+                onClick={onInvertToggle}
+                color={invert ? 'primary' : 'default'}
+              >
+                <InvertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Reset all">
             <IconButton size="small" onClick={onResetEnhancements}>
               <ResetIcon fontSize="small" />
             </IconButton>

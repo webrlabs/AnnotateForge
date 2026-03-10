@@ -108,26 +108,68 @@ class TrainingService:
 
         # Fetch images and annotations from selected projects
         project_ids = [UUID(p) for p in config['projects']]
-        images = self.db.query(Image).filter(Image.project_id.in_(project_ids)).all()
+        version_id = config.get('dataset_version_id')
 
-        if not images:
-            raise ValueError("No images found in selected projects")
+        if version_id:
+            # Use frozen dataset version
+            from app.models.dataset_version import DatasetVersion, DatasetVersionImage
+            version = self.db.query(DatasetVersion).filter(DatasetVersion.id == version_id).first()
+            if not version:
+                raise ValueError(f"Dataset version {version_id} not found")
 
-        # Fetch annotations
-        image_ids = [img.id for img in images]
-        annotations = self.db.query(Annotation).filter(Annotation.image_id.in_(image_ids)).all()
+            version_images = (
+                self.db.query(DatasetVersionImage)
+                .filter(DatasetVersionImage.version_id == version_id)
+                .all()
+            )
+            if not version_images:
+                raise ValueError("Dataset version has no images")
 
-        # Group annotations by image
-        annotations_by_image = {}
-        for ann in annotations:
-            if ann.image_id not in annotations_by_image:
-                annotations_by_image[ann.image_id] = []
-            annotations_by_image[ann.image_id].append(ann)
+            # Get actual Image objects for the version
+            vi_image_ids = [vi.image_id for vi in version_images]
+            images = self.db.query(Image).filter(Image.id.in_(vi_image_ids)).all()
+            image_map = {img.id: img for img in images}
 
-        # Filter images that have annotations
-        images_with_annotations = [
-            img for img in images if img.id in annotations_by_image
-        ]
+            # Build annotations from frozen snapshots, converting dicts to
+            # SimpleNamespace so downstream code can use attribute access (.type, .class_label, etc.)
+            from types import SimpleNamespace
+            annotations_by_image = {}
+            for vi in version_images:
+                if vi.annotation_snapshot:
+                    annotations_by_image[vi.image_id] = [
+                        SimpleNamespace(**ann) for ann in vi.annotation_snapshot
+                    ]
+
+            images_with_annotations = [
+                image_map[vi.image_id]
+                for vi in version_images
+                if vi.image_id in image_map and vi.annotation_snapshot
+            ]
+
+            logger.info(f"📦 Using dataset version '{version.name}' (v{version.version_number}) "
+                        f"with {len(images_with_annotations)} annotated images")
+        else:
+            # Use live annotations (original behavior)
+            images = self.db.query(Image).filter(Image.project_id.in_(project_ids)).all()
+
+            if not images:
+                raise ValueError("No images found in selected projects")
+
+            # Fetch annotations
+            image_ids = [img.id for img in images]
+            annotations = self.db.query(Annotation).filter(Annotation.image_id.in_(image_ids)).all()
+
+            # Group annotations by image
+            annotations_by_image = {}
+            for ann in annotations:
+                if ann.image_id not in annotations_by_image:
+                    annotations_by_image[ann.image_id] = []
+                annotations_by_image[ann.image_id].append(ann)
+
+            # Filter images that have annotations
+            images_with_annotations = [
+                img for img in images if img.id in annotations_by_image
+            ]
 
         if not images_with_annotations:
             raise ValueError("No images with annotations found")

@@ -9,7 +9,7 @@ import os
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.api.routes import auth, projects, images, annotations, inference, export, import_route, health, collaboration, locks, training
+from app.api.routes import auth, projects, images, annotations, inference, export, import_route, health, collaboration, locks, training, templates, dataset_stats, dataset_versions
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +20,18 @@ logger = logging.getLogger(__name__)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Add missing columns to existing tables (safe for repeated runs)
+with engine.connect() as conn:
+    try:
+        conn.execute(
+            __import__('sqlalchemy').text(
+                "ALTER TABLE images ADD COLUMN IF NOT EXISTS phash VARCHAR(64)"
+            )
+        )
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Column migration check: {e}")
 
 # Create FastAPI app
 app = FastAPI(
@@ -55,6 +67,9 @@ app.include_router(import_route.router, prefix=settings.API_V1_PREFIX)
 app.include_router(collaboration.router, prefix=settings.API_V1_PREFIX)
 app.include_router(locks.router, prefix=settings.API_V1_PREFIX)
 app.include_router(training.router, prefix=settings.API_V1_PREFIX)
+app.include_router(templates.router, prefix=settings.API_V1_PREFIX)
+app.include_router(dataset_stats.router, prefix=settings.API_V1_PREFIX)
+app.include_router(dataset_versions.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

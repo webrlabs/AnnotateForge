@@ -13,6 +13,7 @@ import { TrainingWizard } from '@/components/Training/TrainingWizard';
 import { TrainingMonitor } from '@/components/Training/TrainingMonitor';
 import { ModelList } from '@/components/Training/ModelList';
 import { ApiDocs } from '@/components/Docs/ApiDocs';
+import DatasetDashboard from '@/components/Stats/DatasetDashboard';
 import { UserProfile } from '@/components/Profile/UserProfile';
 
 // Create React Query client
@@ -82,6 +83,16 @@ function App() {
                   <ProtectedRoute>
                     <ErrorBoundary>
                       <ProjectView />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/:projectId/stats"
+                element={
+                  <ProtectedRoute>
+                    <ErrorBoundary>
+                      <DatasetDashboard />
                     </ErrorBoundary>
                   </ProtectedRoute>
                 }

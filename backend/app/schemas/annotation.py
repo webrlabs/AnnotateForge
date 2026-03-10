@@ -46,6 +46,17 @@ class AnnotationUpdate(BaseModel):
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
+class BatchUpdateRequest(BaseModel):
+    """Schema for batch updating annotations"""
+    annotation_ids: list[UUID]
+    updates: AnnotationUpdate
+
+
+class BatchDeleteRequest(BaseModel):
+    """Schema for batch deleting annotations"""
+    annotation_ids: list[UUID]
+
+
 class AnnotationResponse(BaseModel):
     """Schema for annotation response"""
     id: UUID

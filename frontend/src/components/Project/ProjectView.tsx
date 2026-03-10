@@ -52,11 +52,32 @@ import {
   Lock as LockIcon,
 } from '@mui/icons-material';
 import { projectAPI } from '@/services/projectService';
+import { datasetAPI } from '@/services/datasetService';
 import { imageAPI } from '@/services/imageService';
 import { exportAPI, type ExportFormat } from '@/services/exportService';
 import { importAPI, type ImportFormat, type ImportResult } from '@/services/importService';
 import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 import { ProjectMembersDialog } from './ProjectMembersDialog';
+import VersionManager from '@/components/Dataset/VersionManager';
+import SplitManager from '@/components/Dataset/SplitManager';
+import DuplicateReview from '@/components/Dataset/DuplicateReview';
+
+// Deterministic color assignment for class labels
+const CLASS_COLORS = [
+  '#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#c62828',
+  '#00838f', '#4e342e', '#283593', '#558b2f', '#ad1457',
+];
+
+function getClassColor(className: string, projectClasses: string[]): string {
+  const index = projectClasses.indexOf(className);
+  if (index >= 0) return CLASS_COLORS[index % CLASS_COLORS.length];
+  // Fallback: hash the class name for consistent color
+  let hash = 0;
+  for (let i = 0; i < className.length; i++) {
+    hash = className.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CLASS_COLORS[Math.abs(hash) % CLASS_COLORS.length];
+}
 
 export default function ProjectView() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -84,6 +105,9 @@ export default function ProjectView() {
   const imagesPerPage = 50;
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+  const [versionManagerOpen, setVersionManagerOpen] = useState(false);
+  const [splitManagerOpen, setSplitManagerOpen] = useState(false);
+  const [duplicateReviewOpen, setDuplicateReviewOpen] = useState(false);
 
   // Fetch project details
   const { data: project } = useQuery({
@@ -96,6 +120,13 @@ export default function ProjectView() {
   const { data: images = [], isLoading } = useQuery({
     queryKey: ['images', projectId],
     queryFn: () => imageAPI.getByProject(projectId!),
+    enabled: !!projectId,
+  });
+
+  // Fetch split assignments (for badges)
+  const { data: splitData } = useQuery({
+    queryKey: ['dataset-split', projectId],
+    queryFn: () => datasetAPI.getSplit(projectId!),
     enabled: !!projectId,
   });
 
@@ -426,6 +457,33 @@ export default function ProjectView() {
                 Export
               </Button>
             </Tooltip>
+            <Tooltip title="Dataset Versions">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setVersionManagerOpen(true)}
+              >
+                Versions
+              </Button>
+            </Tooltip>
+            <Tooltip title="Train/Val/Test Split">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setSplitManagerOpen(true)}
+              >
+                Split
+              </Button>
+            </Tooltip>
+            <Tooltip title="Find Duplicate Images">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setDuplicateReviewOpen(true)}
+              >
+                Duplicates
+              </Button>
+            </Tooltip>
             <Tooltip title="Jump to First Unannotated Image">
               <IconButton
                 color="primary"
@@ -457,11 +515,23 @@ export default function ProjectView() {
               expandIcon={<ExpandMoreIcon />}
               sx={{ bgcolor: 'background.paper' }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                 <BarChartIcon color="primary" />
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                   Project Statistics
                 </Typography>
+                <Box sx={{ flexGrow: 1 }} />
+                <Chip
+                  label="Full Dashboard"
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/projects/${projectId}/stats`);
+                  }}
+                  sx={{ mr: 2 }}
+                />
               </Box>
             </AccordionSummary>
             <AccordionDetails sx={{ bgcolor: 'background.default' }}>
@@ -732,7 +802,7 @@ export default function ProjectView() {
             <Grid container spacing={2}>
               {paginatedImages.map((image) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={image.id}>
-                  <Card>
+                  <Card sx={{ position: 'relative' }}>
                     <CardMedia
                       component="img"
                       height="200"
@@ -741,6 +811,87 @@ export default function ProjectView() {
                       sx={{ objectFit: 'cover', cursor: 'pointer' }}
                       onClick={() => handleOpenImage(image.id)}
                     />
+
+                    {/* Total annotation count badge - top right */}
+                    {image.annotation_counts && image.annotation_counts.total > 0 && (
+                      <Box sx={{
+                        position: 'absolute', top: 8, right: 8,
+                        bgcolor: 'primary.main', color: 'white',
+                        borderRadius: '12px', px: 1, py: 0.25,
+                        fontSize: '0.75rem', fontWeight: 'bold',
+                        minWidth: 24, textAlign: 'center',
+                        boxShadow: 1,
+                      }}>
+                        {image.annotation_counts.total}
+                      </Box>
+                    )}
+
+                    {/* Split badge - top left */}
+                    {splitData?.assignments?.[image.id] && (
+                      <Box sx={{
+                        position: 'absolute', top: 8, left: 8,
+                        bgcolor: splitData.assignments[image.id] === 'train' ? '#4caf50'
+                          : splitData.assignments[image.id] === 'val' ? '#1976d2' : '#ff9800',
+                        color: 'white',
+                        borderRadius: '4px', px: 0.75, py: 0.25,
+                        fontSize: '0.65rem', fontWeight: 'bold',
+                        boxShadow: 1,
+                        textTransform: 'uppercase',
+                      }}>
+                        {splitData.assignments[image.id] === 'train' ? 'T'
+                          : splitData.assignments[image.id] === 'val' ? 'V' : 'Te'}
+                      </Box>
+                    )}
+
+                    {/* Per-class label badges - bottom overlay */}
+                    {image.annotation_counts && (() => {
+                      const classEntries = Object.entries(image.annotation_counts.by_class)
+                        .filter(([cls]) => cls !== 'unlabeled');
+                      if (classEntries.length === 0) return null;
+                      return (
+                        <Box sx={{
+                          position: 'absolute', bottom: 48, left: 0, right: 0,
+                          px: 0.5, py: 0.5,
+                          display: 'flex', flexWrap: 'wrap', gap: 0.5,
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+                        }}>
+                          {classEntries.slice(0, 5).map(([cls, count]) => (
+                            <Chip
+                              key={cls}
+                              label={`${cls}: ${count}`}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.65rem',
+                                bgcolor: getClassColor(cls, project?.classes || []),
+                                color: 'white',
+                                '& .MuiChip-label': { px: 0.75 },
+                              }}
+                            />
+                          ))}
+                          {classEntries.length > 5 && (
+                            <Chip
+                              label={`+${classEntries.length - 5}`}
+                              size="small"
+                              sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'grey.600', color: 'white' }}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })()}
+
+                    {/* No annotations indicator */}
+                    {(!image.annotation_counts || image.annotation_counts.total === 0) && (
+                      <Box sx={{
+                        position: 'absolute', bottom: 52, right: 8,
+                        bgcolor: 'rgba(0,0,0,0.5)', color: 'grey.400',
+                        borderRadius: '4px', px: 0.75, py: 0.25,
+                        fontSize: '0.65rem',
+                      }}>
+                        No labels
+                      </Box>
+                    )}
+
                     <CardActions>
                       <Typography variant="body2" noWrap sx={{ flex: 1 }}>
                         {image.filename}
@@ -1205,6 +1356,27 @@ export default function ProjectView() {
           onClose={() => setMembersDialogOpen(false)}
           project={project}
         />
+      )}
+
+      {/* Dataset Management Dialogs */}
+      {projectId && (
+        <>
+          <VersionManager
+            projectId={projectId}
+            open={versionManagerOpen}
+            onClose={() => setVersionManagerOpen(false)}
+          />
+          <SplitManager
+            projectId={projectId}
+            open={splitManagerOpen}
+            onClose={() => setSplitManagerOpen(false)}
+          />
+          <DuplicateReview
+            projectId={projectId}
+            open={duplicateReviewOpen}
+            onClose={() => setDuplicateReviewOpen(false)}
+          />
+        </>
       )}
     </Container>
   );

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Dict
 from uuid import UUID
 import os
 import shutil
@@ -15,7 +15,7 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.image import Image
 from app.models.annotation import Annotation
-from app.schemas.image import ImageResponse, ImageUpdate
+from app.schemas.image import ImageResponse, ImageUpdate, AnnotationCounts
 from app.services.image_processor import ImageProcessor
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -57,17 +57,52 @@ def get_project_images(
     # Get images
     images = db.query(Image).filter(Image.project_id == project_id).offset(skip).limit(limit).all()
 
-    # Add annotation count and annotation classes
+    if not images:
+        return []
+
+    image_ids = [img.id for img in images]
+
+    # Single bulk query for annotation stats (replaces N+1 individual queries)
+    annotation_stats = db.query(
+        Annotation.image_id,
+        Annotation.class_label,
+        Annotation.type,
+        func.count(Annotation.id).label('count'),
+    ).filter(
+        Annotation.image_id.in_(image_ids)
+    ).group_by(
+        Annotation.image_id,
+        Annotation.class_label,
+        Annotation.type,
+    ).all()
+
+    # Build per-image count maps
+    counts_map: Dict[UUID, dict] = {}
+    for row in annotation_stats:
+        img_id = row.image_id
+        if img_id not in counts_map:
+            counts_map[img_id] = {
+                'total': 0,
+                'by_class': {},
+                'by_type': {},
+                'classes_set': set(),
+            }
+        entry = counts_map[img_id]
+        entry['total'] += row.count
+
+        cls = row.class_label or 'unlabeled'
+        entry['by_class'][cls] = entry['by_class'].get(cls, 0) + row.count
+        if row.class_label:
+            entry['classes_set'].add(row.class_label)
+
+        entry['by_type'][row.type] = entry['by_type'].get(row.type, 0) + row.count
+
+    # Build response
     result = []
     for image in images:
-        annotation_count = db.query(func.count(Annotation.id)).filter(Annotation.image_id == image.id).scalar()
-
-        # Get unique annotation classes for this image
-        annotation_classes = db.query(Annotation.class_label).filter(
-            Annotation.image_id == image.id,
-            Annotation.class_label.isnot(None)
-        ).distinct().all()
-        annotation_classes = [ac[0] for ac in annotation_classes if ac[0]]
+        stats = counts_map.get(image.id, {
+            'total': 0, 'by_class': {}, 'by_type': {}, 'classes_set': set(),
+        })
 
         image_dict = {
             "id": image.id,
@@ -83,8 +118,13 @@ def get_project_images(
             "uploaded_by": image.uploaded_by,
             "created_at": image.created_at,
             "metadata": image.image_metadata,
-            "annotation_count": annotation_count,
-            "annotation_classes": annotation_classes
+            "annotation_count": stats['total'],
+            "annotation_classes": list(stats['classes_set']),
+            "annotation_counts": AnnotationCounts(
+                total=stats['total'],
+                by_class=stats['by_class'],
+                by_type=stats['by_type'],
+            ),
         }
         result.append(ImageResponse(**image_dict))
 

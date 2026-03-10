@@ -18,7 +18,8 @@ import {
   Paper,
   Stack,
 } from '@mui/material';
-import { Delete as DeleteIcon, DeleteSweep as DeleteSweepIcon, ExpandMore as ExpandMoreIcon, BarChart as StatsIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, DeleteSweep as DeleteSweepIcon, ExpandMore as ExpandMoreIcon, BarChart as StatsIcon, FiberManualRecord as DotIcon } from '@mui/icons-material';
+import { getClassColor } from '@/utils/classColors';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAnnotationStore } from '@/store/annotationStore';
 import { annotationAPI } from '@/services/annotationService';
@@ -294,7 +295,10 @@ export default function AnnotationList({ imageId, projectClasses, image }: Annot
                     key={className}
                     label={`${className}: ${count}`}
                     size="small"
-                    color={className === 'Unclassified' ? 'default' : 'success'}
+                    sx={className === 'Unclassified' ? {} : {
+                      bgcolor: getClassColor(className, projectClasses),
+                      color: 'white',
+                    }}
                   />
                 ))}
               </Stack>
@@ -338,8 +342,12 @@ export default function AnnotationList({ imageId, projectClasses, image }: Annot
                               <Chip
                                 label={annotation.class_label}
                                 size="small"
-                                color="success"
-                                sx={{ ml: 1, verticalAlign: 'middle' }}
+                                sx={{
+                                  ml: 1,
+                                  verticalAlign: 'middle',
+                                  bgcolor: getClassColor(annotation.class_label, projectClasses),
+                                  color: 'white',
+                                }}
                               />
                             )}
                           </>
@@ -391,6 +399,7 @@ export default function AnnotationList({ imageId, projectClasses, image }: Annot
                           </MenuItem>
                           {projectClasses.map((className) => (
                             <MenuItem key={className} value={className}>
+                              <DotIcon sx={{ fontSize: 14, color: getClassColor(className, projectClasses), mr: 1 }} />
                               {className}
                             </MenuItem>
                           ))}

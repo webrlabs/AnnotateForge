@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, IconButton, Tooltip, Divider, Typography, Badge } from '@mui/material';
 import {
   PanTool as SelectIcon,
+  OpenWith as PanIcon,
   Circle as CircleIcon,
   CropSquare as BoxIcon,
   Rectangle as RectangleIcon,
@@ -52,6 +53,7 @@ export default function ToolPanel({
 
   const tools: { type: ToolType; icon: React.ReactNode; label: string; shortcut?: string; description?: string }[] = [
     { type: 'select', icon: <SelectIcon />, label: 'Select', shortcut: 'V', description: 'Click to select, drag to box select' },
+    { type: 'pan', icon: <PanIcon />, label: 'Pan', shortcut: 'H', description: 'Drag to pan the canvas' },
     { type: 'circle', icon: <CircleIcon />, label: 'Circle', shortcut: 'C' },
     { type: 'rectangle', icon: <RectangleIcon />, label: 'Rectangle', shortcut: 'R' },
     { type: 'polygon', icon: <PolygonIcon />, label: 'Polygon', shortcut: 'P' },

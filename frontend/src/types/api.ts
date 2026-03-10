@@ -23,6 +23,7 @@ export interface InferenceResponse {
 
 export type ToolType =
   | 'select'
+  | 'pan'
   | 'circle'
   | 'box'
   | 'rectangle'

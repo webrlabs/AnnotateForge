@@ -1,3 +1,9 @@
+export interface AnnotationCounts {
+  total: number;
+  by_class: Record<string, number>;
+  by_type: Record<string, number>;
+}
+
 export interface Image {
   id: string;
   project_id: string;
@@ -14,6 +20,7 @@ export interface Image {
   metadata: Record<string, any>;
   annotation_count: number;
   annotation_classes: string[];
+  annotation_counts?: AnnotationCounts;
 }
 
 export interface ImageUpload {

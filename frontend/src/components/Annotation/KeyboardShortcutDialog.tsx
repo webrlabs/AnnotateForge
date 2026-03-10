@@ -26,11 +26,11 @@ export default function KeyboardShortcutDialog({ open, onClose }: KeyboardShortc
   const shortcuts: Shortcut[] = [
     // Tools
     { keys: ['V'], description: 'Select tool (click to select, drag to box select)', category: 'Manual Tools' },
+    { keys: ['H'], description: 'Pan tool (drag to pan canvas)', category: 'Manual Tools' },
     { keys: ['C'], description: 'Circle tool', category: 'Manual Tools' },
     { keys: ['R'], description: 'Rectangle tool', category: 'Manual Tools' },
     { keys: ['P'], description: 'Polygon tool', category: 'Manual Tools' },
     { keys: ['Enter'], description: 'Finish polygon or SAM2 segmentation', category: 'Manual Tools' },
-    { keys: ['Esc'], description: 'Cancel current drawing', category: 'Manual Tools' },
 
     // AI Tools
     { keys: ['S'], description: 'SAM2 tool (click points, Enter to segment)', category: 'AI Tools' },
@@ -53,10 +53,17 @@ export default function KeyboardShortcutDialog({ open, onClose }: KeyboardShortc
 
     // Quick Class Assignment
     { keys: ['1-9'], description: 'Assign class to selected annotations', category: 'Quick Actions' },
+    { keys: ['I'], description: 'Toggle invert colors', category: 'Quick Actions' },
+    { keys: ['M'], description: 'Toggle minimap', category: 'Quick Actions' },
+    { keys: ['G'], description: 'Toggle grid snapping', category: 'Quick Actions' },
+    { keys: ['T'], description: 'Toggle template panel', category: 'Quick Actions' },
 
     // Navigation
+    { keys: ['Esc'], description: 'Back to project', category: 'Navigation' },
     { keys: ['←'], description: 'Previous image', category: 'Navigation' },
-    { keys: ['→'], description: 'Next image', category: 'Navigation' },
+    { keys: ['→'], description: 'Next image (skips annotated if auto-advance on)', category: 'Navigation' },
+    { keys: ['Ctrl', 'Enter'], description: 'Advance to next image', category: 'Navigation' },
+    { keys: ['Right-click'], description: 'Context menu (set class, copy, delete)', category: 'Navigation' },
 
     // Zoom
     { keys: ['+', '='], description: 'Zoom in', category: 'Zoom' },

@@ -19,15 +19,18 @@ import ToolPanel from './ToolPanel';
 import AnnotationList from './AnnotationList';
 import KeyboardShortcutDialog from './KeyboardShortcutDialog';
 import { ImageToolbar } from './ImageToolbar';
+import ClassHotkeyBar from './ClassHotkeyBar';
+import TemplatePanel from './TemplatePanel';
 
 export default function AnnotationView() {
   const { projectId, imageId } = useParams<{ projectId: string; imageId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { setAnnotations, undo, redo, canUndo, canRedo, copySelected, pasteClipboard, duplicateSelected, selectedIds, updateAnnotation, addAnnotation, deleteAnnotation } = useAnnotationStore();
-  const { brightness, contrast, setBrightness, setContrast, setTool } = useUIStore();
+  const { annotations: storeAnnotations, setAnnotations, undo, redo, canUndo, canRedo, copySelected, pasteClipboard, duplicateSelected, selectedIds, updateAnnotation, addAnnotation, deleteAnnotation } = useAnnotationStore();
+  const { brightness, contrast, saturation, gamma, invert, setBrightness, setContrast, setSaturation, setGamma, setInvert, resetEnhancements, setTool, autoAdvance, setAutoAdvance, toggleMinimap, toggleSnapping, activeClass, setActiveClass } = useUIStore();
   const lastImageIdRef = useRef<string | null>(null);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [templatePanelOpen, setTemplatePanelOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; severity: 'info' | 'success' | 'warning' | 'error' } | null>(null);
   const previousActiveUsersRef = useRef<Map<string, string>>(new Map()); // user_id -> username
   const isInitialMountRef = useRef(true);
@@ -51,9 +54,35 @@ export default function AnnotationView() {
   });
 
   const handleResetEnhancements = () => {
-    setBrightness(0);
-    setContrast(0);
+    resetEnhancements();
   };
+
+  // Create annotation mutation for template application
+  const createAnnotationMutation = useMutation({
+    mutationFn: ({ imageId, data }: { imageId: string; data: any }) =>
+      annotationAPI.create(imageId, data),
+    onSuccess: (annotation) => {
+      addAnnotation(annotation);
+    },
+  });
+
+  const handleApplyTemplate = (templateAnnotations: Array<Record<string, any>>) => {
+    if (!imageId) return;
+    templateAnnotations.forEach(ann => {
+      createAnnotationMutation.mutate({
+        imageId,
+        data: {
+          type: ann.type,
+          data: ann.data,
+          class_label: ann.class_label || undefined,
+          source: 'manual' as const,
+        },
+      });
+    });
+    setTemplatePanelOpen(false);
+  };
+
+  const selectedAnnotations = storeAnnotations.filter(a => selectedIds.includes(a.id));
 
   // Zoom control functions
   const triggerZoom = (command: string) => {
@@ -214,6 +243,17 @@ export default function AnnotationView() {
   };
 
   const handleNextImage = () => {
+    if (autoAdvance) {
+      // Skip to next unannotated image
+      const currentIdx = projectImages.findIndex(img => img.id === imageId);
+      const nextUnannotated = projectImages.slice(currentIdx + 1).find(
+        img => img.annotation_count === 0
+      );
+      if (nextUnannotated) {
+        navigate(`/projects/${projectId}/images/${nextUnannotated.id}`);
+        return;
+      }
+    }
     if (nextImageId) {
       navigate(`/projects/${projectId}/images/${nextImageId}`);
     }
@@ -262,6 +302,11 @@ export default function AnnotationView() {
         e.preventDefault();
         redo();
       }
+      // Ctrl+Enter for advance to next image
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleNextImage();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -281,10 +326,20 @@ export default function AnnotationView() {
 
       const key = e.key.toLowerCase();
 
+      // Escape: navigate back to project
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        navigate(`/projects/${projectId}`);
+        return;
+      }
+
       // Tool shortcuts
       if (key === 'v') {
         e.preventDefault();
         setTool('select');
+      } else if (key === 'h') {
+        e.preventDefault();
+        setTool('pan');
       } else if (key === 'c') {
         e.preventDefault();
         setTool('circle');
@@ -303,12 +358,24 @@ export default function AnnotationView() {
       } else if (key === 'b') {
         e.preventDefault();
         setTool('simpleblob');
+      } else if (key === 'i') {
+        e.preventDefault();
+        setInvert(!invert);
+      } else if (key === 'm') {
+        e.preventDefault();
+        toggleMinimap();
+      } else if (key === 'g') {
+        e.preventDefault();
+        toggleSnapping();
+      } else if (key === 't') {
+        e.preventDefault();
+        setTemplatePanelOpen(prev => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setTool]);
+  }, [setTool, invert, setInvert, toggleMinimap, toggleSnapping]);
 
   // Copy/paste/duplicate keyboard shortcuts
   useEffect(() => {
@@ -352,23 +419,27 @@ export default function AnnotationView() {
 
       // Check if it's a number key 1-9
       const keyNum = parseInt(e.key);
-      if (keyNum >= 1 && keyNum <= 9 && project?.classes && selectedIds.length > 0) {
+      if (keyNum >= 1 && keyNum <= 9 && project?.classes) {
         e.preventDefault();
         const classIndex = keyNum - 1;
         if (classIndex < project.classes.length) {
           const className = project.classes[classIndex];
-          // Update all selected annotations with this class
-          selectedIds.forEach(id => {
-            updateAnnotation(id, { class_label: className });
-            updateClassMutation.mutate({ id, class_label: className });
-          });
+          // Set as active class for new annotations
+          setActiveClass(activeClass === className ? null : className);
+          // Also update all selected annotations with this class
+          if (selectedIds.length > 0) {
+            selectedIds.forEach(id => {
+              updateAnnotation(id, { class_label: className });
+              updateClassMutation.mutate({ id, class_label: className });
+            });
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [project, selectedIds, updateAnnotation]);
+  }, [project, selectedIds, updateAnnotation, activeClass, setActiveClass]);
 
   // Keyboard shortcut help dialog
   useEffect(() => {
@@ -393,6 +464,8 @@ export default function AnnotationView() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Image-specific toolbar */}
       <ImageToolbar
+        projectName={project?.name}
+        onNavigateToProject={() => navigate(`/projects/${projectId}`)}
         currentImageIndex={currentImageIndex}
         totalImages={projectImages.length}
         hasPrevious={hasPrevious}
@@ -406,11 +479,34 @@ export default function AnnotationView() {
         onZoom={triggerZoom}
         brightness={brightness}
         contrast={contrast}
+        saturation={saturation}
+        gamma={gamma}
+        invert={invert}
         onBrightnessChange={setBrightness}
         onContrastChange={setContrast}
+        onSaturationChange={setSaturation}
+        onGammaChange={setGamma}
+        onInvertToggle={() => setInvert(!invert)}
         onResetEnhancements={handleResetEnhancements}
+        autoAdvance={autoAdvance}
+        onAutoAdvanceToggle={() => setAutoAdvance(!autoAdvance)}
         onHelpOpen={() => setHelpDialogOpen(true)}
         imageFilename={image?.filename}
+      />
+
+      {/* Class hotkey bar */}
+      <ClassHotkeyBar
+        classes={project?.classes || []}
+        activeClass={activeClass}
+        onActiveClassChange={setActiveClass}
+        onClassSelect={(cls) => {
+          if (selectedIds.length > 0) {
+            selectedIds.forEach(id => {
+              updateAnnotation(id, { class_label: cls });
+              updateClassMutation.mutate({ id, class_label: cls });
+            });
+          }
+        }}
       />
 
       {/* Main content area */}
@@ -459,6 +555,7 @@ export default function AnnotationView() {
               yoloConfidence={yoloConfidence}
               sam2Multimask={sam2Multimask}
               simpleBlobParams={simpleBlobParams}
+              projectClasses={project?.classes || []}
             />
           )}
         </Box>
@@ -490,6 +587,15 @@ export default function AnnotationView() {
           <AnnotationList imageId={imageId!} projectClasses={project?.classes || []} image={image} />
         </Box>
       </Box>
+
+      {/* Template Panel */}
+      <TemplatePanel
+        open={templatePanelOpen}
+        onClose={() => setTemplatePanelOpen(false)}
+        projectId={projectId!}
+        selectedAnnotations={selectedAnnotations}
+        onApplyTemplate={handleApplyTemplate}
+      />
 
       {/* Keyboard Shortcut Help Dialog */}
       <KeyboardShortcutDialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} />

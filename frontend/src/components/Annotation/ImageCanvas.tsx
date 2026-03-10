@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { Stage, Layer, Image as KonvaImage, Circle, Rect, Line } from 'react-konva';
 import useImage from 'use-image';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Box, CircularProgress, Typography, Backdrop } from '@mui/material';
+import { Box, CircularProgress, Typography, Backdrop, Menu, MenuItem, ListItemIcon, ListItemText, Divider as MuiDivider } from '@mui/material';
+import { Delete as DeleteIcon, Label as LabelIcon, ContentCopy as CopyIcon, FiberManualRecord as DotIcon } from '@mui/icons-material';
+import { getClassColor } from '@/utils/classColors';
+import Minimap from './Minimap';
 import { useUIStore } from '@/store/uiStore';
 import { useAnnotationStore } from '@/store/annotationStore';
 import { annotationAPI } from '@/services/annotationService';
@@ -28,6 +31,7 @@ interface ImageCanvasProps {
   yoloConfidence?: number;
   sam2Multimask?: boolean;
   simpleBlobParams?: SimpleBlobParams;
+  projectClasses?: string[];
 }
 
 export default function ImageCanvas({
@@ -45,10 +49,11 @@ export default function ImageCanvas({
     max_area: 1000,
     filter_by_circularity: true,
   },
+  projectClasses = [],
 }: ImageCanvasProps) {
   const [image] = useImage(imageUrl);
-  const { currentTool, brightness, contrast, setTool } = useUIStore();
-  const { annotations, selectedIds, selectAnnotation, addAnnotation, clearSelection, deleteAnnotation, updateAnnotation, updateAnnotationLocal } = useAnnotationStore();
+  const { currentTool, brightness, contrast, saturation, gamma, invert, showMinimap, snapping, setTool, activeClass } = useUIStore();
+  const { annotations, selectedIds, selectAnnotation, addAnnotation, clearSelection, deleteAnnotation, deleteSelected, copySelected, updateAnnotation, updateAnnotationLocal } = useAnnotationStore();
   const queryClient = useQueryClient();
 
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
@@ -61,6 +66,7 @@ export default function ImageCanvas({
   const [sam2Points, setSam2Points] = useState<{ points: number[][]; labels: number[] }>({ points: [], labels: [] });
   const [boxSelection, setBoxSelection] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<{ annotationId: string; pointIndex: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number } | null>(null);
 
   const stageRef = useRef<Konva.Stage>(null);
   const imageRef = useRef<Konva.Image>(null);
@@ -71,6 +77,47 @@ export default function ImageCanvas({
     end?: [number, number];
     startPos?: { x: number; y: number };
   } | null>(null);
+
+  // Snap helper: snaps a point to grid or nearby annotation vertices
+  const snapPoint = (x: number, y: number, excludeId?: string): { x: number; y: number } => {
+    if (!snapping.enabled) return { x, y };
+
+    let snapX = x, snapY = y;
+    let minDist = snapping.snapThreshold;
+
+    // Grid snapping
+    const gridX = Math.round(x / snapping.gridSize) * snapping.gridSize;
+    const gridY = Math.round(y / snapping.gridSize) * snapping.gridSize;
+    const gridDist = Math.hypot(gridX - x, gridY - y);
+    if (gridDist < minDist) {
+      snapX = gridX;
+      snapY = gridY;
+      minDist = gridDist;
+    }
+
+    // Vertex snapping
+    if (snapping.snapToVertices) {
+      for (const ann of annotations) {
+        if (ann.id === excludeId) continue;
+        const vertices: [number, number][] = [];
+        if (ann.type === 'circle') vertices.push([ann.data.x, ann.data.y]);
+        else if (ann.type === 'polygon') vertices.push(...ann.data.points);
+        else if (ann.type === 'box' || ann.type === 'rectangle') vertices.push(...ann.data.corners);
+        else if (ann.type === 'line') { vertices.push(ann.data.start); vertices.push(ann.data.end); }
+
+        for (const [vx, vy] of vertices) {
+          const dist = Math.hypot(vx - x, vy - y);
+          if (dist < minDist) {
+            snapX = vx;
+            snapY = vy;
+            minDist = dist;
+          }
+        }
+      }
+    }
+
+    return { x: snapX, y: snapY };
+  };
 
   // Zoom functions
   const fitToScreen = () => {
@@ -206,15 +253,37 @@ export default function ImageCanvas({
     }
   }, [image, imageWidth, imageHeight]);
 
-  // Apply CSS filter to canvas
+  // Apply CSS filters to canvas (brightness, contrast, saturation, gamma, invert)
   useEffect(() => {
     const canvas = stageRef.current?.content;
     if (canvas) {
       const brightnessPercent = 100 + brightness;
       const contrastPercent = 100 + contrast;
-      canvas.style.filter = `brightness(${brightnessPercent}%) contrast(${contrastPercent}%)`;
+      // Gamma correction via SVG filter (CSS has no native gamma)
+      const gammaExponent = 1 / gamma;
+      const svgFilterId = 'gamma-filter';
+      let svgEl = document.getElementById(svgFilterId + '-svg') as SVGSVGElement | null;
+      if (!svgEl) {
+        svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('id', svgFilterId + '-svg');
+        svgEl.style.position = 'absolute';
+        svgEl.style.width = '0';
+        svgEl.style.height = '0';
+        svgEl.innerHTML = `<filter id="${svgFilterId}"><feComponentTransfer><feFuncR type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/><feFuncG type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/><feFuncB type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/></feComponentTransfer></filter>`;
+        document.body.appendChild(svgEl);
+      } else {
+        svgEl.innerHTML = `<filter id="${svgFilterId}"><feComponentTransfer><feFuncR type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/><feFuncG type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/><feFuncB type="gamma" exponent="${gammaExponent}" amplitude="1" offset="0"/></feComponentTransfer></filter>`;
+      }
+      const filters = [
+        `brightness(${brightnessPercent}%)`,
+        `contrast(${contrastPercent}%)`,
+        `saturate(${saturation}%)`,
+        gamma !== 1.0 ? `url(#${svgFilterId})` : '',
+        invert ? 'invert(100%)' : '',
+      ].filter(Boolean).join(' ');
+      canvas.style.filter = filters;
     }
-  }, [brightness, contrast]);
+  }, [brightness, contrast, saturation, gamma, invert]);
 
   // Create annotation mutation
   const createMutation = useMutation({
@@ -332,8 +401,18 @@ export default function ImageCanvas({
     if (!pos) return;
 
     // Convert to image coordinates (accounting for layer transform)
-    const x = (pos.x - position.x) / scale;
-    const y = (pos.y - position.y) / scale;
+    const rawX = (pos.x - position.x) / scale;
+    const rawY = (pos.y - position.y) / scale;
+    const snapped = snapPoint(rawX, rawY);
+    const x = snapped.x;
+    const y = snapped.y;
+
+    // Handle pan tool
+    if (currentTool === 'pan') {
+      setIsPanning(true);
+      setLastPanPoint({ x: pos.x, y: pos.y });
+      return;
+    }
 
     // Handle box selection with select tool
     if (currentTool === 'select') {
@@ -401,6 +480,20 @@ export default function ImageCanvas({
   };
 
   const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Handle pan tool drag
+    if (isPanning && currentTool === 'pan' && lastPanPoint) {
+      const stage = e.target.getStage();
+      if (!stage) return;
+      const pos = stage.getPointerPosition();
+      if (!pos) return;
+      setPosition({
+        x: position.x + (pos.x - lastPanPoint.x),
+        y: position.y + (pos.y - lastPanPoint.y),
+      });
+      setLastPanPoint({ x: pos.x, y: pos.y });
+      return;
+    }
+
     if (!isDrawing || currentTool === 'polygon') return;
 
     const stage = e.target.getStage();
@@ -410,8 +503,11 @@ export default function ImageCanvas({
     if (!pos) return;
 
     // Convert to image coordinates (accounting for layer transform)
-    const x = (pos.x - position.x) / scale;
-    const y = (pos.y - position.y) / scale;
+    const rawX = (pos.x - position.x) / scale;
+    const rawY = (pos.y - position.y) / scale;
+    const snapped = snapPoint(rawX, rawY);
+    const x = snapped.x;
+    const y = snapped.y;
 
     // Update box selection
     if (currentTool === 'select' && boxSelection) {
@@ -436,6 +532,12 @@ export default function ImageCanvas({
   };
 
   const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (isPanning) {
+      setIsPanning(false);
+      setLastPanPoint(null);
+      return;
+    }
+
     if (!isDrawing) return;
 
     setIsDrawing(false);
@@ -521,6 +623,7 @@ export default function ImageCanvas({
               size: drawingData.size,
             },
             source: 'manual' as const,
+            class_label: activeClass || undefined,
           };
         }
         break;
@@ -536,6 +639,7 @@ export default function ImageCanvas({
             type: 'rectangle' as const,
             data: { corners },
             source: 'manual' as const,
+            class_label: activeClass || undefined,
           };
         }
         break;
@@ -551,6 +655,7 @@ export default function ImageCanvas({
               end: [drawingData.x2, drawingData.y2],
             },
             source: 'manual' as const,
+            class_label: activeClass || undefined,
           };
         }
         break;
@@ -620,6 +725,7 @@ export default function ImageCanvas({
           type: 'polygon' as const,
           data: { points: drawingData.points },
           source: 'manual' as const,
+          class_label: activeClass || undefined,
         };
         createMutation.mutate(annotationData);
         setDrawingData(null);
@@ -680,16 +786,23 @@ export default function ImageCanvas({
   };
 
   return (
-    <>
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
     <Stage
       ref={stageRef}
       width={stageSize.width}
       height={stageSize.height}
+      style={{ cursor: currentTool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onClick={handleStageClick}
       onWheel={handleWheel}
+      onContextMenu={(e) => {
+        e.evt.preventDefault();
+        if (selectedIds.length > 0) {
+          setContextMenu({ mouseX: e.evt.clientX, mouseY: e.evt.clientY });
+        }
+      }}
     >
       <Layer
         x={position.x}
@@ -706,10 +819,42 @@ export default function ImageCanvas({
           />
         )}
 
+        {/* Grid overlay when snapping is enabled (limit to max ~200 lines for performance) */}
+        {snapping.enabled && scale >= 0.5 && (imageWidth / snapping.gridSize + imageHeight / snapping.gridSize) < 200 && (() => {
+          const gridLines: React.ReactNode[] = [];
+          const gs = snapping.gridSize;
+          for (let gx = 0; gx <= imageWidth; gx += gs) {
+            gridLines.push(
+              <Line
+                key={`gv-${gx}`}
+                points={[gx, 0, gx, imageHeight]}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={1 / scale}
+                listening={false}
+              />
+            );
+          }
+          for (let gy = 0; gy <= imageHeight; gy += gs) {
+            gridLines.push(
+              <Line
+                key={`gh-${gy}`}
+                points={[0, gy, imageWidth, gy]}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={1 / scale}
+                listening={false}
+              />
+            );
+          }
+          return gridLines;
+        })()}
+
         {/* Existing annotations */}
         {annotations.map((annotation) => {
           const isSelected = selectedIds.includes(annotation.id);
-          const strokeColor = isSelected ? '#00ff00' : '#ff0000';
+          const classColor = annotation.class_label
+            ? getClassColor(annotation.class_label, projectClasses)
+            : '#ff0000';
+          const strokeColor = isSelected ? '#00ff00' : classColor;
           const strokeWidth = isSelected ? 3 : 2;
 
           switch (annotation.type) {
@@ -1328,6 +1473,59 @@ export default function ImageCanvas({
       </Layer>
     </Stage>
 
+    {/* Minimap overlay */}
+    <Minimap
+      imageUrl={imageUrl}
+      imageWidth={imageWidth}
+      imageHeight={imageHeight}
+      viewportX={position.x}
+      viewportY={position.y}
+      viewportWidth={stageSize.width}
+      viewportHeight={stageSize.height}
+      zoom={scale}
+      onPan={(x, y) => setPosition({ x, y })}
+      visible={showMinimap}
+    />
+
+    {/* Right-click context menu */}
+    <Menu
+      open={contextMenu !== null}
+      onClose={() => setContextMenu(null)}
+      anchorReference="anchorPosition"
+      anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
+    >
+      <MenuItem disabled>
+        <ListItemText>{selectedIds.length} selected</ListItemText>
+      </MenuItem>
+      <MuiDivider />
+      {projectClasses.map((cls) => (
+        <MenuItem key={cls} onClick={() => {
+          selectedIds.forEach(id => {
+            updateAnnotation(id, { class_label: cls });
+            annotationAPI.update(id, { class_label: cls });
+          });
+          setContextMenu(null);
+        }}>
+          <ListItemIcon><DotIcon fontSize="small" sx={{ color: getClassColor(cls, projectClasses) }} /></ListItemIcon>
+          <ListItemText>Set class: {cls}</ListItemText>
+        </MenuItem>
+      ))}
+      {projectClasses.length > 0 && <MuiDivider />}
+      <MenuItem onClick={() => { copySelected(); setContextMenu(null); }}>
+        <ListItemIcon><CopyIcon fontSize="small" /></ListItemIcon>
+        <ListItemText>Copy</ListItemText>
+      </MenuItem>
+      <MenuItem onClick={() => {
+        const ids = [...selectedIds];
+        deleteSelected();
+        ids.forEach(id => annotationAPI.delete(id).catch(() => {}));
+        setContextMenu(null);
+      }} sx={{ color: 'error.main' }}>
+        <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+        <ListItemText>Delete All</ListItemText>
+      </MenuItem>
+    </Menu>
+
     {/* AI Inference Loading Overlay */}
     {(yoloMutation.isPending || sam2Mutation.isPending || simpleBlobMutation.isPending) && (
       <Backdrop
@@ -1357,6 +1555,6 @@ export default function ImageCanvas({
         </Typography>
       </Backdrop>
     )}
-  </>
+  </Box>
   );
 }
